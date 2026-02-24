@@ -26,7 +26,7 @@ typedef struct
     uint8_t task_stack_size;
 } TaskHandle;
 
-typedef TaskHandle* TaskHandle_t;
+typedef TaskHandle *TaskHandle_t;
 /*任务创建函数*/
 state_return TaskCreate(TaskHandle_t *taskhandle, TaskFunction taskfuction, uint8_t task_priority, uint8_t task_stack_size);
 

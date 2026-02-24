@@ -63,11 +63,11 @@ state_return TaskDelete(TaskHandle_t *taskhandle)
     state_return xreturn = pdTRUE;
     if (taskhandle != NULL)
     {
-        state_return Free_state = MemFree((*taskhandle)->task_stack);
-        if (Free_state != pdTRUE)
+        state_return state = MemFree((*taskhandle)->task_stack);
+        if (state != pdTRUE)
             xreturn = pdFALSE;
-        Free_state = MemFree(*taskhandle);
-        if (Free_state != pdTRUE)
+        state = MemFree(*taskhandle);
+        if (state != pdTRUE)
             xreturn = pdFALSE;
     }
     else
