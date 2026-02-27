@@ -8,7 +8,7 @@
  * @note     :
  *************************************************************************/
 
-#include "heap.h"
+#include "../include/heap.h"
 
 static uint8_t Memstack[Memstack_size] __attribute__((aligned(8)));
 
@@ -70,7 +70,7 @@ memaddress MemAllocate(uint8_t memsize)
     {
         return NULL;
     }
-    return (memaddress)NewMemBlock;
+    return (memaddress)(NewMemBlock + MemBlockSize);
 }
 
 /**

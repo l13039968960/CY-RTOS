@@ -11,6 +11,61 @@
 #include "task.h"
 #include "heap.h"
 
+static uint64_t Current_Systick = 0;
+static uint64_t NextBlockedTaskTick = MaxDelayTime;
+static TaskHandle_t Current_TCB;
+
+// extern void *ListGetHeadItem(void);
+
+/**
+ * @brief  Tick递增函数
+ * @return  pdTRUE: 需要任务切换
+ *          pdFALSE: 不需要任务切换
+ * @note
+ */
+state_return TaskIncrementTick(void)
+{
+    TaskHandle_t TCB;
+    uint64_t ItemValue;
+    state_return xreturn = pdFALSE;
+    Current_Systick += 1;
+    if (Current_Systick >= NextBlockedTaskTick)
+    {
+        while (1)
+        {
+            TCB = ListGetHeadItem(/*DelayTaskList*/);
+            if (TCB == NULL)
+            {
+                NextBlockedTaskTick = MaxDelayTime;
+                break;
+            }
+            else
+            {
+                ItemValue = TaskGetStateValue(/*TCB*/);
+                if (Current_Systick < ItemValue)
+                {
+                    NextBlockedTaskTick = ItemValue;
+                    break;
+                }
+                else
+                {
+                    TaskRemoveFromList(/*TCB, DelayTaskList*/);
+                    TaskAddToList(/*TCB, ReadyTaskList*/);
+                    if (TCB->task_priority > Current_TCB->task_priority)
+                    {
+                        xreturn = pdTRUE;
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        xreturn = pdFALSE;
+    }
+    return xreturn;
+}
+
 /**
  * @brief  任务创建函数
  * @param  taskhandle: 任务句柄

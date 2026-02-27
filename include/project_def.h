@@ -16,12 +16,16 @@ typedef unsigned short uint16t;
 typedef short int16_t;
 typedef unsigned int uint32_t;
 typedef int int32_t;
+typedef unsigned long long int uint64_t;
+typedef long long int int64_t;
 
 typedef void (*TaskFunction)(void *);
 
 typedef uint8_t state_return;
 #define pdTRUE 1
 #define pdFALSE 0
+
+#define MaxDelayTime 0xFFFFFFFFULL
 
 #define NULL ((void *)0)
 
