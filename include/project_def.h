@@ -29,6 +29,10 @@ typedef uint8_t state_return;
 
 #define NULL ((void *)0)
 
+#define __IS_NULL__(P) \
+    if (P == NULL)     \
+        return pdFALSE;
+
 typedef uint8_t *memaddress;
 
 #endif
