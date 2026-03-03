@@ -22,6 +22,9 @@ static state_return TaskAddToEventList(TaskHandle_t TCB, List_t EventList);
 static state_return TaskAddToDelayList(TaskHandle_t TCB, uint64_t DelayTime);
 static state_return TaskAddToReadyList(TaskHandle_t TCB);
 
+static state_return TaskRemoveFromStateList(TaskHandle_t TCB);
+static state_return TaskRemoveFromEventList(TaskHandle_t TCB);
+
 /**
  * @brief  Tick递增函数
  * @return  pdTRUE: 需要任务切换
@@ -30,36 +33,46 @@ static state_return TaskAddToReadyList(TaskHandle_t TCB);
  */
 state_return TaskIncrementTick(void)
 {
+    /*变量定义*/
     TaskHandle_t TCB;
     uint64_t ItemValue;
     List_Item *DelayListHeadItem;
     state_return xreturn = pdFALSE;
+    /*计数器加一*/
     Current_Systick += 1;
+    /*当前计数器大于等于下一个任务解锁时间*/
     if (Current_Systick >= NextBlockedTaskTick)
     {
+        /*遍历所有满足条件节点*/
         while (1)
         {
+            /*延时列表首节点*/
             DelayListHeadItem = ListGetHeadItem(&DelayTaskList);
             if (DelayListHeadItem == NULL)
             {
+                /*首节点为空，下一个任务解释时间为最大延时时间*/
                 NextBlockedTaskTick = MaxDelayTime;
                 break;
             }
             else
             {
+                /*获取任务控制块和延时时间*/
                 TCB = (TaskHandle_t)(DelayListHeadItem->Owner);
                 ItemValue = ListGetItemValue(DelayListHeadItem);
                 if (Current_Systick < ItemValue)
                 {
+                    /*当前计时器小于延时时间，更新下一任务解锁时间*/
                     NextBlockedTaskTick = ItemValue;
                     break;
                 }
                 else
                 {
-                    TaskRemoveFromDelayList(TCB);
-                    TaskAddToReadyList(TCB);
+                    /*当前计时器大于等于延时时间*/
+                    TaskRemoveFromDelayList(TCB); // 移除延时列表
+                    TaskAddToReadyList(TCB);      // 插入就绪列表
                     if (TCB->task_priority > Current_TCB->task_priority)
                     {
+                        /*优先级大于当前任务优先级，进行任务转换*/
                         xreturn = pdTRUE;
                     }
                 }
@@ -172,6 +185,7 @@ static state_return TaskAddToDelayList(TaskHandle_t TCB, uint64_t DelayTime)
 {
     /*判断参数是否为空*/
     __IS_NULL__(TCB)
+
     /*插入列表*/
     if (ListItemInsert(&(TCB->StateListItem), &DelayTaskList, DelayTime) == pdTRUE)
         return pdTRUE;
@@ -190,8 +204,47 @@ static state_return TaskAddToReadyList(TaskHandle_t TCB)
 {
     /*判断参数是否为空*/
     __IS_NULL__(TCB)
+
     /*插入列表*/
     if (ListItemInsert(&(TCB->StateListItem), &ReadyTaskList, TCB->task_priority) == pdTRUE)
+        return pdTRUE;
+    else
+        return pdFALSE;
+}
+
+/**
+ * @brief  任务删除状态列表函数
+ * @param  TCB: 任务句柄
+ * @return  pdTRUE: 创建成功
+ *          pdFALSE: 创建失败
+ * @note
+ */
+static state_return TaskRemoveFromStateList(TaskHandle_t TCB)
+{
+    /*判断参数是否为空*/
+    __IS_NULL__(TCB)
+
+    /*删除*/
+    if (ListItemRemove(&(TCB->StateListItem)) == pdTRUE)
+        return pdTRUE;
+    else
+        return pdFALSE;
+}
+
+/**
+ * @brief  任务删除时间列表函数
+ * @param  TCB: 任务句柄
+ * @return  pdTRUE: 创建成功
+ *          pdFALSE: 创建失败
+ * @note
+ */
+static state_return TaskRemoveFromEventList(TaskHandle_t TCB)
+{
+    /*判断参数是否为空*/
+    __IS_NULL__(TCB)
+
+    /*删除*/
+    if (ListItemRemove(&(TCB->EventListItem)) == pdTRUE)
         return pdTRUE;
     else
         return pdFALSE;

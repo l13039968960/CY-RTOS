@@ -13,25 +13,27 @@
 
 #include "os_config.h"
 #include "project_def.h"
+#include "list.h"
 
 #define Free_state 1
 #define Allocated_state 0
 
 #define Mem_aligen 0x0007
 
-typedef struct MemBlock
+typedef struct MemoryControlBlock
 {
-    uint8_t block_state;
-    uint8_t block_size;
+    // uint8_t block_state;
+    uint64_t block_size;
     uint8_t block_base_address;
-    struct MemBlock *nextblock;
-} MemBlock;
+    List_Item MemoryListItem;
+} MCB;
 
-uint8_t MemBlockSize = ((sizeof(MemBlock) & Mem_aligen) != 0) ? ((sizeof(MemBlock) - (Mem_aligen & sizeof(MemBlock))) + 8) : sizeof(MemBlock);
-
+typedef MCB *MCB_t;
 /*内存分配*/
-memaddress MemAllocate(uint8_t memsize);
+void *MemAllocate(uint64_t memsize);
 /*内存释放*/
 state_return MemFree(memaddress MemAddress);
+/*内存初始化*/
+void Heap_Init(void);
 
 #endif

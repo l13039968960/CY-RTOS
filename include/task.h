@@ -29,26 +29,12 @@ typedef struct
     List_Item EventListItem;
 } TaskHandle;
 
-#define TaskRemoveFromDelayList(TCB)                                                              \
-    do                                                                                            \
-    {                                                                                             \
-        (((TCB)->StateListItem).PreListItem)->NextListItem = ((TCB)->StateListItem).NextListItem; \
-        (((TCB)->StateListItem).NextListItem)->PreListItem = ((TCB)->StateListItem).PreListItem;  \
-        ((TCB)->StateListItem).Container = NULL;                                                  \
-    } while (0)
-
-#define TaskRemoveFromEventList(TCB)                                                              \
-    do                                                                                            \
-    {                                                                                             \
-        (((TCB)->EventListItem).PreListItem)->NextListItem = ((TCB)->EventListItem).NextListItem; \
-        (((TCB)->EventListItem).NextListItem)->PreListItem = ((TCB)->EventListItem).PreListItem;  \
-        ((TCB)->EventListItem).Container = NULL;                                                  \
-    } while (0)
-
 typedef TaskHandle *TaskHandle_t;
+
+/*Tick递增函数*/
+state_return TaskIncrementTick(void);
 /*任务创建函数*/
 state_return TaskCreate(TaskHandle_t *taskhandle, TaskFunction taskfuction, uint8_t task_priority, uint8_t task_stack_size);
-
 /*任务删除函数*/
 state_return TaskDelete(TaskHandle_t taskhandle);
 

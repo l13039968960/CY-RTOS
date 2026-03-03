@@ -8,15 +8,18 @@
  * @note     :
  *************************************************************************/
 #include "../include/os_config.h"
+#include "../include/project_def.h"
 
 void OS_Init(void)
 {
-
 }
 
 void PortSysTickHandler(void)
 {
-    
+    if (TaskIncrementTick() == pdTRUE)
+    {
+        
+    }
 }
 
 void PortPendSVCHandler(void)
@@ -25,5 +28,4 @@ void PortPendSVCHandler(void)
 
 void PortSVCHandler(void)
 {
-
 }

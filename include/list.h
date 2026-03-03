@@ -14,7 +14,6 @@
 #include "project_def.h"
 
 struct List;
-
 typedef struct List_Item
 {
     uint64_t ItemValue;
@@ -45,7 +44,11 @@ typedef struct List *List_t;
 
 /*列表创建函数*/
 state_return ListCreat(List_t *List);
+/*列表静态创建函数*/
+state_return ListCreatStatic(List_t List);
 /*列表项插入函数*/
 state_return ListItemInsert(List_Item *ListItem, List_t List, uint64_t ItemValue);
+/*列表项删除函数*/
+state_return ListItemRemove(List_Item *ListItem);
 
 #endif

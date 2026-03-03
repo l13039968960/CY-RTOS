@@ -45,6 +45,30 @@ state_return ListCreat(List_t *List)
 }
 
 /**
+ * @brief  静态列表创建函数
+ * @param  List: 创建的列表
+ * @return  pdTRUE: 创建成功
+ *          pdFALSE: 创建失败
+ * @note
+ */
+
+state_return ListCreatStatic(List_t List)
+{
+    /*判断参数是否为空*/
+    __IS_NULL__(List)
+
+    List->Itemindex = (List_Item *)&(List->ListEndItem);
+    /*列表成员初始为0*/
+    List->NumberOfList = 0;
+    /*确保哨兵节点始终处于列表末尾*/
+    List->ListEndItem.ItemValue = MaxDelayTime;
+    /*哨兵节点首尾相连*/
+    List->ListEndItem.NextListItem = (List_Item *)&(List->ListEndItem);
+    List->ListEndItem.PreListItem = (List_Item *)&(List->ListEndItem);
+    return pdTRUE;
+}
+
+/**
  * @brief  列表项插入函数
  * @param  ListItem: 插入的列表项
  * @param  List: 被插入的列表
@@ -62,6 +86,7 @@ state_return ListItemInsert(List_Item *ListItem, List_t List, uint64_t ItemValue
     List_Item *pListItem = (List_Item *)&(List->ListEndItem);
     ListItem->ItemValue = ItemValue;
     ListItem->Container = List;
+    List->NumberOfList++;
     /*遍历列表，寻找第一个大于ItemValue的列表项*/
     for (pListItem = pListItem->NextListItem;
          (ItemValue >= pListItem->ItemValue) && (pListItem != (List_Item *)&(List->ListEndItem));
@@ -72,5 +97,23 @@ state_return ListItemInsert(List_Item *ListItem, List_t List, uint64_t ItemValue
     ListItem->PreListItem = pListItem->PreListItem;
     pListItem->PreListItem = ListItem;
     ListItem->NextListItem = pListItem;
+    return pdTRUE;
+}
+
+/**
+ * @brief  列表项删除函数
+ * @param  ListItem: 删除的列表项
+ * @return pdTRUE:插入成功
+ *         pdFALSE:插入失败
+ * @note   列表项按列表值从小到大排序
+ */
+state_return ListItemRemove(List_Item *ListItem)
+{
+    /*判断参数是否为空*/
+    __IS_NULL__(ListItem)
+
+    ListItem->Container = NULL;
+    ListItem->PreListItem->NextListItem = ListItem->NextListItem;
+    ListItem->NextListItem->PreListItem = ListItem->PreListItem;
     return pdTRUE;
 }
