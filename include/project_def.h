@@ -21,7 +21,7 @@ typedef long long int int64_t;
 
 typedef void (*TaskFunction)(void *);
 
-typedef uint8_t state_return;
+typedef uint8_t rState;
 #define pdTRUE 1
 #define pdFALSE 0
 

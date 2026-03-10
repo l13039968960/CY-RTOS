@@ -18,21 +18,25 @@
 #define Free_state 1
 #define Allocated_state 0
 
-#define Mem_aligen 0x0007
+#define MEM_ALIGN_SIZE 0x0008
+#define MEM_ALIGN_MASK 0x0007
+
+typedef uint32_t Mem_Type;
+typedef uint32_t *pMem_Type;
 
 typedef struct MemoryControlBlock
 {
     // uint8_t block_state;
     uint64_t block_size;
-    uint8_t block_base_address;
+    uint32_t block_base_address;
     List_Item MemoryListItem;
 } MCB;
 
 typedef MCB *MCB_t;
 /*内存分配*/
-void *MemAllocate(uint64_t memsize);
+rState MemAllocate(uint64_t Memsize, pMem_Type *pHead);
 /*内存释放*/
-state_return MemFree(memaddress MemAddress);
+rState MemFree(memaddress MemAddress);
 /*内存初始化*/
 void Heap_Init(void);
 

@@ -13,18 +13,19 @@
 #include "project_def.h"
 #include "os_config.h"
 #include "list.h"
+#include "heap.h"
 
-#define task_ready_state 1
-#define task_running_state 0
-#define task_blocked_state -1
+typedef pMem_Type pStack_Type;
 
 typedef struct
 {
-    TaskFunction taskfuction;
-    memaddress task_stack;
-    uint8_t task_state;
-    uint8_t task_priority;
-    uint8_t task_stack_size;
+    pStack_Type Task_TopOfStack;
+    pMem_Type Task_Stack;
+
+    uint8_t Task_Priority;
+    uint32_t Task_SizeOfStack;
+    TaskFunction Task_Fuction;
+
     List_Item StateListItem;
     List_Item EventListItem;
 } TaskHandle;
@@ -32,10 +33,10 @@ typedef struct
 typedef TaskHandle *TaskHandle_t;
 
 /*Tick递增函数*/
-state_return TaskIncrementTick(void);
+rState TaskIncrementTick(void);
 /*任务创建函数*/
-state_return TaskCreate(TaskHandle_t *taskhandle, TaskFunction taskfuction, uint8_t task_priority, uint8_t task_stack_size);
+rState TaskCreate(TaskHandle_t *taskhandle, TaskFunction Task_Fuction, uint8_t Task_Priority, uint32_t Task_SizeOfStack);
 /*任务删除函数*/
-state_return TaskDelete(TaskHandle_t taskhandle);
+rState TaskDelete(TaskHandle_t taskhandle);
 
 #endif

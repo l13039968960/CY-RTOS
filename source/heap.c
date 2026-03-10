@@ -10,9 +10,9 @@
 
 #include "../include/heap.h"
 
-static uint8_t Memstack[Memstack_size] __attribute__((aligned(8)));
+static uint8_t Memstack[Memstack_size * sizeof(Mem_Type)] __attribute__((aligned(8)));
 
-static const uint8_t MemBlockSize = ((sizeof(MCB) & Mem_aligen) != 0) ? ((sizeof(MCB) - (Mem_aligen & sizeof(MCB))) + 8) : sizeof(MCB);
+static const uint8_t MCB_SturctSize = (sizeof(MCB) + MEM_ALIGN_MASK) & ~MEM_ALIGN_MASK; /*内存控制块结构体所占用的字节数(8的倍数)*/
 
 static List FreeMemoryBlockList;
 
@@ -20,50 +20,56 @@ static void FreeBlockMerge(MCB *RemoveBlock);
 
 /**
  * @brief  内存分配函数
- * @param  memsize: 内存大小
- * @return  memaddress：内存首地址
- *          NULL: 分配失败
+ * @param  memsize: 分配内存大小(字)
+ * @param  pHead: 分配的内存的首地址
+ * @param  pEnd: 分配的内存的尾地址
+ * @return pdTRUE:分配成功
+ *         pdFALSE:分配失败
  * @note
  */
-void *MemAllocate(uint64_t memsize)
+rState MemAllocate(uint64_t Memsize, pMem_Type *pHead)
 {
     MCB *NewMemBlock;
-    void *xreturn = NULL;
-    uint64_t wanted_memsize = memsize + MemBlockSize;
+    rState xreturn = pdTRUE;
+    uint64_t Wanted_MemsizeBytes = Memsize * 4 + MCB_SturctSize; /*所需分配的字节数*/
+
     /*确保分配的内存块为8字节对齐*/
-    if ((wanted_memsize & Mem_aligen) != 0)
-        wanted_memsize = (wanted_memsize - (Mem_aligen & wanted_memsize)) + 8;
+    Wanted_MemsizeBytes += MEM_ALIGN_SIZE - (Wanted_MemsizeBytes & MEM_ALIGN_MASK);
+
     /*判断内存大小是否合理*/
-    if ((wanted_memsize > 0) && (wanted_memsize < Memstack_size))
+    if ((Wanted_MemsizeBytes > 0) && (Wanted_MemsizeBytes < Memstack_size * sizeof(Mem_Type)))
     {
-        List_Item *pListItem = (List_Item *)(&(FreeMemoryBlockList.ListEndItem));
+        List_Item *pListItem = (List_Item *)(&(FreeMemoryBlockList.ListEndItem)); /*索引指针指向空闲列表哨兵节点*/
+
+        /*地址从低到高寻找第一个满足所需容量大小的空闲内存块*/
         for (pListItem = pListItem->NextListItem;
-             (wanted_memsize > ((MCB *)(pListItem->Owner))->block_size) && (pListItem != (List_Item *)(&(FreeMemoryBlockList.ListEndItem)));
+             (Wanted_MemsizeBytes > ((MCB *)(pListItem->Owner))->block_size) && (pListItem != (List_Item *)(&(FreeMemoryBlockList.ListEndItem)));
              pListItem = pListItem->NextListItem)
             ;
-        if (pListItem == NULL)
-            return NULL;
-        else
+
+        /*判断是否可以找到符合条件的空闲内存块*/
+        if (pListItem != (List_Item *)(&(FreeMemoryBlockList.ListEndItem)))
         {
+
             NewMemBlock = (MCB *)pListItem->Owner;
             uint64_t ItemValue = NewMemBlock->block_size;
-            NewMemBlock->block_size = wanted_memsize;
+            NewMemBlock->block_size = Wanted_MemsizeBytes;
             // NewMemBlock->Owner = Owner;
-            xreturn = (void *)(NewMemBlock + MemBlockSize);
+            *pHead = (pMem_Type)(NewMemBlock + MCB_SturctSize);
 
+            /*从空闲块列表中移除*/
             ListItemRemove(&(NewMemBlock->MemoryListItem));
             /*判断该内存块剩余大小可否再分为一个空闲块*/
-            if (ItemValue - wanted_memsize >= MemBlockSize)
+            if (ItemValue - Wanted_MemsizeBytes >= MCB_SturctSize)
             {
                 /*新MCB初始化*/
-                uint64_t Newmemaddress = NewMemBlock->block_base_address + wanted_memsize;
+                uint64_t Newmemaddress = NewMemBlock->block_base_address + Wanted_MemsizeBytes;
                 NewMemBlock = (MCB *)&Memstack[Newmemaddress];
                 NewMemBlock->block_base_address = Newmemaddress;
-                NewMemBlock->block_size = ItemValue - wanted_memsize;
+                NewMemBlock->block_size = ItemValue - Wanted_MemsizeBytes;
                 // NewMemBlock->Owner = NULL;
 
                 /*新MCB列表项初始化*/
-                NewMemBlock->MemoryListItem.Owner = (void *)NewMemBlock;
                 NewMemBlock->MemoryListItem.Owner = (void *)NewMemBlock;
                 ListItemInsert(&(NewMemBlock->MemoryListItem), &FreeMemoryBlockList, Newmemaddress);
             }
@@ -72,10 +78,16 @@ void *MemAllocate(uint64_t memsize)
                 NewMemBlock->block_size = ItemValue;
             }
         }
+        else
+        {
+            /*没有找到满足条件的空闲内存块*/
+            xreturn = pdFALSE;
+        }
     }
     else
     {
-        return NULL;
+        /*所需内存大小不符合要求*/
+        xreturn = pdFALSE;
     }
     return xreturn;
 }
@@ -87,7 +99,7 @@ void *MemAllocate(uint64_t memsize)
  *          pdFALSE: 释放失败
  * @note
  */
-state_return MemFree(memaddress MemAddress)
+rState MemFree(Mem_Type MemAddress)
 {
     MCB *WillFreeBlock, *PreMemoryBlock, *NextMemoryBlock;
 
