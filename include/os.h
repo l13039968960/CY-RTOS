@@ -10,6 +10,12 @@
 #ifndef __OS_H__
 #define __OS_H__
 
-void OS_Init(void);
+#define DISABLE_INTERRUPT() RASIE_Basepri()
+#define ENABLE_INTERRUPT() Clear_Basepri()
+
+void EnterCritical(void);
+void ExitCritical(void);
+void RASIE_Basepri(void);
+void Clear_Basepri(void);
 
 #endif

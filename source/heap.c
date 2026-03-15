@@ -20,7 +20,7 @@ static void FreeBlockMerge(MCB *RemoveBlock);
 
 /**
  * @brief  内存分配函数
- * @param  memsize: 分配内存大小(字)
+ * @param  memsize: 分配内存大小(字节)
  * @param  pHead: 分配的内存的首地址
  * @param  pEnd: 分配的内存的尾地址
  * @return pdTRUE:分配成功
@@ -31,7 +31,7 @@ rState MemAllocate(uint64_t Memsize, pMem_Type *pHead)
 {
     MCB *NewMemBlock;
     rState xreturn = pdTRUE;
-    uint64_t Wanted_MemsizeBytes = Memsize * 4 + MCB_SturctSize; /*所需分配的字节数*/
+    uint64_t Wanted_MemsizeBytes = Memsize + MCB_SturctSize; /*所需分配的字节数*/
 
     /*确保分配的内存块为8字节对齐*/
     Wanted_MemsizeBytes += MEM_ALIGN_SIZE - (Wanted_MemsizeBytes & MEM_ALIGN_MASK);
@@ -147,20 +147,19 @@ void Heap_Init(void)
 {
     /*初始化空闲内存块列表*/
     ListCreatStatic(&FreeMemoryBlockList);
-    /*初始化初始内存块*/
-    MCB *InitBlock = (MCB *)&Memstack;
-    InitBlock->block_base_address = 0;
-    InitBlock->block_size = Memstack_size;
-    // InitBlock->block_state = Free_state;
-    // InitBlock->Owner = NULL;
+
+    /*初始化第一个空闲内存块*/
+    MCB *FirstFreeBlock = (MCB *)&Memstack;
+    FirstFreeBlock->block_base_address = 0;
+    FirstFreeBlock->block_size = Memstack_size;
 
     /*初始化初始内存块列表项*/
-    InitBlock->MemoryListItem.ItemValue = 0;
-    InitBlock->MemoryListItem.Container = &FreeMemoryBlockList;
-    InitBlock->MemoryListItem.Owner = (void *)InitBlock;
+    FirstFreeBlock->MemoryListItem.ItemValue = 0;
+    FirstFreeBlock->MemoryListItem.Container = &FreeMemoryBlockList;
+    FirstFreeBlock->MemoryListItem.Owner = (void *)FirstFreeBlock;
 
     /*插入空闲内存块列表*/
-    ListItemInsert(&(InitBlock->MemoryListItem), &FreeMemoryBlockList, 0);
+    ListItemInsert(&(FirstFreeBlock->MemoryListItem), &FreeMemoryBlockList, 0);
 }
 
 /**

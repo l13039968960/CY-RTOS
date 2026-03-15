@@ -18,14 +18,14 @@
  * @note
  */
 
-state_return ListCreat(List_t *List)
+rState ListCreat(List_t *List)
 {
-    /*判断参数是否为空*/
+    /*判断参数合理性*/
     __IS_NULL__(List)
 
     List_t NewList;
     /*动态分配内存*/
-    NewList = (List_t)MemAllocate(sizeof(List));
+    MemAllocate(sizeof(List), &NewList);
     /*分配失败*/
     if (NewList == NULL)
         return pdFALSE;
@@ -52,11 +52,12 @@ state_return ListCreat(List_t *List)
  * @note
  */
 
-state_return ListCreatStatic(List_t List)
+rState ListCreatStatic(List_t List)
 {
-    /*判断参数是否为空*/
+    /*判断参数合理性*/
     __IS_NULL__(List)
 
+    /*列表索引指向哨兵节点*/
     List->Itemindex = (List_Item *)&(List->ListEndItem);
     /*列表成员初始为0*/
     List->NumberOfList = 0;
@@ -77,26 +78,30 @@ state_return ListCreatStatic(List_t List)
  *         pdFALSE:插入失败
  * @note   列表项按列表值从小到大排序
  */
-state_return ListItemInsert(List_Item *ListItem, List_t List, uint64_t ItemValue)
+rState ListItemInsert(List_Item *ListItem, List_t List, uint64_t ItemValue)
 {
-    /*判断参数是否为空*/
+    /*判断参数合理性*/
     __IS_NULL__(ListItem)
     __IS_NULL__(List)
+    __IS_ZERO__(ItemValue)
 
     List_Item *pListItem = (List_Item *)&(List->ListEndItem);
     ListItem->ItemValue = ItemValue;
     ListItem->Container = List;
     List->NumberOfList++;
+
     /*遍历列表，寻找第一个大于ItemValue的列表项*/
     for (pListItem = pListItem->NextListItem;
          (ItemValue >= pListItem->ItemValue) && (pListItem != (List_Item *)&(List->ListEndItem));
          pListItem = pListItem->NextListItem)
         ;
+
     /*插入列表项 */
     pListItem->PreListItem->NextListItem = ListItem;
     ListItem->PreListItem = pListItem->PreListItem;
     pListItem->PreListItem = ListItem;
     ListItem->NextListItem = pListItem;
+    
     return pdTRUE;
 }
 
@@ -107,7 +112,7 @@ state_return ListItemInsert(List_Item *ListItem, List_t List, uint64_t ItemValue
  *         pdFALSE:插入失败
  * @note   列表项按列表值从小到大排序
  */
-state_return ListItemRemove(List_Item *ListItem)
+rState ListItemRemove(List_Item *ListItem)
 {
     /*判断参数是否为空*/
     __IS_NULL__(ListItem)

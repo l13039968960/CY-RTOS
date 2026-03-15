@@ -11,15 +11,21 @@
 #include "../include/task.h"
 #include "../include/heap.h"
 #include "../include/list.h"
+#include "../include/os.h"
 
 #include "string.h"
 #include "stdio.h"
 
-static uint64_t Current_Systick;
-static uint64_t NextBlockedTaskTick;
-static TaskHandle_t Current_TCB;
-static List ReadyTaskList;
-static List DelayTaskList;
+TaskHandle_t CurrentTCB;           /*当前任务TCB*/
+SchedulerState TaskSchedulerState; /*任务调度器状态*/
+
+static uint64_t CurrentTick;         /*定时器计数器*/
+static uint64_t NextDelayedTaskTick; /*下一任务阻塞超时时间*/
+static List ReadyTaskList;           /*就绪任务列表*/
+static List DelayTaskList;           /*延时阻塞任务列表*/
+
+static TaskHandle_t IdleTask_t;               /*空闲任务句柄*/
+static void IdleTaskFunction(void *paramter); /*空闲任务*/
 
 static rState TaskAddToEventList(TaskHandle_t TCB, List_t EventList);
 static rState TaskAddToDelayList(TaskHandle_t TCB, uint64_t DelayTime);
@@ -27,8 +33,6 @@ static rState TaskAddToReadyList(TaskHandle_t TCB);
 
 static rState TaskRemoveFromStateList(TaskHandle_t TCB);
 static rState TaskRemoveFromEventList(TaskHandle_t TCB);
-
-static void TaskStackInit(TaskHandle_t TCB);
 
 /**
  * @brief  Tick递增函数
@@ -44,9 +48,9 @@ rState TaskIncrementTick(void)
     List_Item *DelayListHeadItem;
     rState xreturn = pdFALSE;
     /*计数器加一*/
-    Current_Systick += 1;
+    CurrentTick += 1;
     /*当前计数器大于等于下一个任务解锁时间*/
-    if (Current_Systick >= NextBlockedTaskTick)
+    if (CurrentTick >= NextDelayedTaskTick)
     {
         /*遍历所有满足条件节点*/
         while (1)
@@ -56,7 +60,7 @@ rState TaskIncrementTick(void)
             if (DelayListHeadItem == NULL)
             {
                 /*首节点为空，下一个任务解释时间为最大延时时间*/
-                NextBlockedTaskTick = MaxDelayTime;
+                NextDelayedTaskTick = MaxDelayTime;
                 break;
             }
             else
@@ -64,10 +68,10 @@ rState TaskIncrementTick(void)
                 /*获取任务控制块和延时时间*/
                 TCB = (TaskHandle_t)(DelayListHeadItem->Owner);
                 ItemValue = ListGetItemValue(DelayListHeadItem);
-                if (Current_Systick < ItemValue)
+                if (CurrentTick < ItemValue)
                 {
                     /*当前计时器小于延时时间，更新下一任务解锁时间*/
-                    NextBlockedTaskTick = ItemValue;
+                    NextDelayedTaskTick = ItemValue;
                     break;
                 }
                 else
@@ -75,7 +79,7 @@ rState TaskIncrementTick(void)
                     /*当前计时器大于等于延时时间*/
                     TaskRemoveFromDelayList(TCB); // 移除延时列表
                     TaskAddToReadyList(TCB);      // 插入就绪列表
-                    if (TCB->Task_Priority > Current_TCB->Task_Priority)
+                    if (TCB->Task_Priority > CurrentTCB->Task_Priority)
                     {
                         /*优先级大于当前任务优先级，进行任务转换*/
                         xreturn = pdTRUE;
@@ -103,11 +107,13 @@ rState TaskIncrementTick(void)
  */
 rState TaskCreate(TaskHandle_t *taskhandle, TaskFunction Task_Fuction, uint8_t Task_Priority, uint32_t Task_SizeOfStack)
 {
+    extern rState TaskStackInit(TaskHandle_t TCB);
+
     rState xreturn = pdTRUE;
     rState xState;
     uint32_t *Stack, TCB;
     /*分配栈空间*/
-    xState = MemAllocate(Task_SizeOfStack, &Stack);
+    xState = MemAllocate(Task_SizeOfStack * 4, &Stack);
     if (xState != pdFALSE)
     {
 
@@ -177,6 +183,64 @@ rState TaskDelete(TaskHandle_t taskhandle)
 }
 
 /**
+ * @brief  切换最高优先级就绪任务控制块函数
+ * @note
+ */
+void TaskSwitchTCB(void)
+{
+    CurrentTCB = (TaskHandle_t)(((ReadyTaskList.ListEndItem).PreListItem)->Owner);
+}
+
+/**
+ * @brief  任务错误退出函数
+ * @note
+ */
+void TaskExitError(void)
+{
+    DISABLE_INTERRUPT();
+    printf("任务异常退出!!!\r\n");
+
+    while (1)
+        ;
+}
+
+static void IdleTaskFunction(void *paramter)
+{
+    while (1)
+        ;
+}
+
+/**
+ * @brief  开启任务调度器函数
+ * @note
+ */
+void TaskStartScheduler(void)
+{
+    extern void StartTaskSchedluer(void);
+
+    /*初始化就绪任务列表、延时阻塞任务列表*/
+    ListCreatStatic(&ReadyTaskList);
+    ListCreatStatic(&DelayTaskList);
+
+    /*初始化堆空间*/
+    Heap_Init();
+
+    /*创建空闲任务*/
+    TaskCreate(&IdleTask_t, IdleTaskFunction, __OS_TASK_LOWEST_PRIORITY__, __OS_TASK_MINIMUN_STACKSIZE__);
+
+    /*初始化运行变量*/
+    TaskSchedulerState = Running;
+    CurrentTick = 0;
+    NextDelayedTaskTick = MaxDelayTime;
+
+    /*切换任务TCB*/
+    TaskSwitchTCB();
+
+    /*底层配置初始化*/
+    StartTaskSchedluer();
+}
+
+/**
  * @brief  任务插入事件列表函数
  * @param  TCB: 任务句柄
  * @param  EventList: 事件列表
@@ -186,8 +250,9 @@ rState TaskDelete(TaskHandle_t taskhandle)
  */
 static rState TaskAddToEventList(TaskHandle_t TCB, List_t EventList)
 {
-    /*判断参数是否为空*/
+    /*判断参数合理性*/
     __IS_NULL__(TCB)
+    __IS_NULL__(EventList)
 
     /*初始化*/
     if (EventList == NULL)
@@ -213,8 +278,9 @@ static rState TaskAddToEventList(TaskHandle_t TCB, List_t EventList)
  */
 static rState TaskAddToDelayList(TaskHandle_t TCB, uint64_t DelayTime)
 {
-    /*判断参数是否为空*/
+    /*判断参数合理性*/
     __IS_NULL__(TCB)
+    __IS_ZERO__(DelayTime)
 
     /*插入列表*/
     if (ListItemInsert(&(TCB->StateListItem), &DelayTaskList, DelayTime) == pdTRUE)
@@ -232,7 +298,7 @@ static rState TaskAddToDelayList(TaskHandle_t TCB, uint64_t DelayTime)
  */
 static rState TaskAddToReadyList(TaskHandle_t TCB)
 {
-    /*判断参数是否为空*/
+    /*判断参数合理性*/
     __IS_NULL__(TCB)
 
     /*插入列表*/
@@ -251,7 +317,7 @@ static rState TaskAddToReadyList(TaskHandle_t TCB)
  */
 static rState TaskRemoveFromStateList(TaskHandle_t TCB)
 {
-    /*判断参数是否为空*/
+    /*判断参数合理性*/
     __IS_NULL__(TCB)
 
     /*删除*/
@@ -270,7 +336,7 @@ static rState TaskRemoveFromStateList(TaskHandle_t TCB)
  */
 static rState TaskRemoveFromEventList(TaskHandle_t TCB)
 {
-    /*判断参数是否为空*/
+    /*判断参数合理性*/
     __IS_NULL__(TCB)
 
     /*删除*/
@@ -278,43 +344,4 @@ static rState TaskRemoveFromEventList(TaskHandle_t TCB)
         return pdTRUE;
     else
         return pdFALSE;
-}
-
-/**
- * @brief  切换当前最高优先级任务控制块函数
- * @note
- */
-void TaskSwitchTCB(void)
-{
-}
-
-void TaskExitError(void)
-{
-    printf("任务异常退出！！！\r\n");
-    while (1)
-    {
-    }
-}
-
-/**
- * @brief  任务栈初始化函数
- * @param  TCB: 任务句柄
- * @note
- */
-static void TaskStackInit(TaskHandle_t TCB)
-{
-    pStack_Type TopOfStack = &(TCB->Task_Stack[TCB->Task_SizeOfStack - 1]);
-    TopOfStack = ((uint32_t)TopOfStack + MEM_ALIGN_MASK) & ~(MEM_ALIGN_MASK);
-
-    memset(TCB->Task_Stack, 0xa5, TCB->Task_SizeOfStack * sizeof(uint32_t)); // 初始化栈空间
-
-    *TopOfStack = (Mem_Type)0x01000000; // PSR
-    TopOfStack--;
-    *TopOfStack = (Mem_Type)TCB->Task_Fuction; // PC
-    TopOfStack--;
-    *TopOfStack = (Mem_Type)TaskExitError; // LR
-    TopOfStack -= 5;                       // R12,R3,R2,R1,R0
-    TopOfStack -= 8;                       // R11,R10,R9,R8,R7,R6,R5,R4
-
-    TCB->Task_TopOfStack = TopOfStack; // 更新栈顶
 }

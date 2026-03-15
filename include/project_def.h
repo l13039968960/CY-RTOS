@@ -33,6 +33,10 @@ typedef uint8_t rState;
     if (P == NULL)     \
         return pdFALSE;
 
+#define __IS_ZERO__(P) \
+    if (P == 0)        \
+        return pdFALSE;
+
 typedef uint8_t *memaddress;
 
 #endif

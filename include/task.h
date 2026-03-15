@@ -12,8 +12,12 @@
 
 #include "project_def.h"
 #include "os_config.h"
-#include "list.h"
 #include "heap.h"
+
+typedef enum{
+    Pending = 0,
+    Running = 1,
+}SchedulerState;
 
 typedef pMem_Type pStack_Type;
 

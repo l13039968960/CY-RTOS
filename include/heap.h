@@ -36,7 +36,7 @@ typedef MCB *MCB_t;
 /*内存分配*/
 rState MemAllocate(uint64_t Memsize, pMem_Type *pHead);
 /*内存释放*/
-rState MemFree(memaddress MemAddress);
+rState MemFree(Mem_Type MemAddress);
 /*内存初始化*/
 void Heap_Init(void);
 
