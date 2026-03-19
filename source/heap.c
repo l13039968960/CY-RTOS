@@ -7,8 +7,11 @@
  * @copyright:
  * @note     :
  *************************************************************************/
+#include "../include/os_config.h"
 
 #include "../include/heap.h"
+
+#include "stdint.h"
 
 static uint8_t Memstack[Memstack_size * sizeof(Mem_Type)] __attribute__((aligned(8)));
 
@@ -55,7 +58,7 @@ rState MemAllocate(uint64_t Memsize, pMem_Type *pHead)
             uint64_t ItemValue = NewMemBlock->block_size;
             NewMemBlock->block_size = Wanted_MemsizeBytes;
             // NewMemBlock->Owner = Owner;
-            *pHead = (pMem_Type)(NewMemBlock + MCB_SturctSize);
+            *pHead = (pMem_Type)((uint32_t)NewMemBlock + (uint32_t)MCB_SturctSize);
 
             /*从空闲块列表中移除*/
             ListItemRemove(&(NewMemBlock->MemoryListItem));
@@ -103,7 +106,7 @@ rState MemFree(Mem_Type MemAddress)
 {
     MCB *WillFreeBlock, *PreMemoryBlock, *NextMemoryBlock;
 
-    WillFreeBlock = (MCB *)(MemAddress);
+    WillFreeBlock = (MCB *)((uint32_t)MemAddress - (uint32_t)MCB_SturctSize);
     List_Item *pListItem = &(WillFreeBlock->MemoryListItem);
 
     ListItemInsert(pListItem, &FreeMemoryBlockList, pListItem->ItemValue);
@@ -129,7 +132,7 @@ rState MemFree(Mem_Type MemAddress)
     /*是否可以和前一个空闲块合并*/
     if ((PreMemoryBlock != NULL) && (PreMemoryBlock->block_base_address + PreMemoryBlock->block_size == WillFreeBlock->block_base_address))
     {
-        FreeBlockMerge(PreMemoryBlock);
+        FreeBlockMerge(WillFreeBlock);
     }
     /*是否可以和后一个空闲块合并 */
     if ((NextMemoryBlock != NULL) && (WillFreeBlock->block_base_address + WillFreeBlock->block_size == NextMemoryBlock->block_base_address))

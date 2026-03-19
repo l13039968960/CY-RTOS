@@ -13,6 +13,8 @@
 #define DISABLE_INTERRUPT() RASIE_Basepri()
 #define ENABLE_INTERRUPT() Clear_Basepri()
 
+void PendTaskSwitch(void);
+
 void EnterCritical(void);
 void ExitCritical(void);
 void RASIE_Basepri(void);

@@ -11,7 +11,7 @@
 #ifndef __LIST_H__
 #define __LIST_H__
 
-#include "project_def.h"
+// #include "project_def.h"
 
 struct List;
 typedef struct List_Item
@@ -43,12 +43,12 @@ typedef struct List *List_t;
 #define ListGetItemValue(ListItem) ((ListItem)->ItemValue)
 
 /*列表创建函数*/
-state_return ListCreat(List_t *List);
+rState ListCreat(List_t *List);
 /*列表静态创建函数*/
-state_return ListCreatStatic(List_t List);
+rState ListCreatStatic(List_t List);
 /*列表项插入函数*/
-state_return ListItemInsert(List_Item *ListItem, List_t List, uint64_t ItemValue);
+rState ListItemInsert(List_Item *ListItem, List_t List, uint64_t ItemValue);
 /*列表项删除函数*/
-state_return ListItemRemove(List_Item *ListItem);
+rState ListItemRemove(List_Item *ListItem);
 
 #endif

@@ -10,33 +10,25 @@
 #ifndef __PROJECTDEF_H__
 #define __PROJECTDEF_H__
 
-typedef unsigned char uint8_t;
-typedef char int8_t;
-typedef unsigned short uint16t;
-typedef short int16_t;
-typedef unsigned int uint32_t;
-typedef int int32_t;
-typedef unsigned long long int uint64_t;
-typedef long long int int64_t;
+#include "stdint.h"
+#include "stdio.h"
 
 typedef void (*TaskFunction)(void *);
 
-typedef uint8_t rState;
-#define pdTRUE 1
-#define pdFALSE 0
+typedef enum
+{
+    pdFALSE = 0,
+    pdTRUE = 1
+} rState;
 
 #define MaxDelayTime 0xFFFFFFFFULL
 
-#define NULL ((void *)0)
-
-#define __IS_NULL__(P) \
+#define __is_null__(P) \
     if (P == NULL)     \
-        return pdFALSE;
+        return pdFALSE
 
-#define __IS_ZERO__(P) \
+#define __is_zero__(P) \
     if (P == 0)        \
-        return pdFALSE;
-
-typedef uint8_t *memaddress;
+        return pdFALSE
 
 #endif

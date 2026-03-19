@@ -14,10 +14,11 @@
 #include "os_config.h"
 #include "heap.h"
 
-typedef enum{
+typedef enum
+{
     Pending = 0,
     Running = 1,
-}SchedulerState;
+} SchedulerState;
 
 typedef pMem_Type pStack_Type;
 
@@ -42,5 +43,7 @@ rState TaskIncrementTick(void);
 rState TaskCreate(TaskHandle_t *taskhandle, TaskFunction Task_Fuction, uint8_t Task_Priority, uint32_t Task_SizeOfStack);
 /*任务删除函数*/
 rState TaskDelete(TaskHandle_t taskhandle);
+
+void TaskStartScheduler(void);
 
 #endif
