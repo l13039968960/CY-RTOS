@@ -13,8 +13,25 @@
 
 #include "os_config.h"
 #include "project_def.h"
-#include "list.h"
+#include "../include/list.h"
 
+/**
+ * @brief  内存控制块结构体
+ * @note   
+ */
+struct HeapMemoryControlBlockHandler
+{
+	/*内存块大小*/
+	uint32_t BlockSize;
+
+	/*内存块基索引*/
+	uint32_t BlockBaseIdx;
+
+	/*内存块列表项*/
+	ListItem_t MemoryBlockListItem;
+};
+
+typedef struct HeapMemoryControlBlockHandler MCB_t;
 /**
  * @brief  栈元素类型
  * @note   
@@ -22,11 +39,6 @@
 typedef uint32_t StackType_t;
 typedef StackType_t * pStackType_t;
 
-/**
- * @brief  内存控制块结构体
- * @note   
- */
-typedef struct HeapMemoryControlBlockHandler MCB_t;
 
 /**
  * @brief  内存分配函数
@@ -49,7 +61,7 @@ BaseState_t sHeapMemFree(StackType_t *MemAddress);
 
 /**
  * @brief  堆栈内存初始化函数
- * @note   只有OSInit会调用
+ * @note   在OSInit被调用
  */
 void vHeapInit(void);
 

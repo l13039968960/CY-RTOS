@@ -11,44 +11,84 @@
 #ifndef __LIST_H__
 #define __LIST_H__
 
-// #include "project_def.h"
-
-struct List;
-typedef struct List_Item
-{
-    uint64_t ItemValue;
-    struct List_Item *NextListItem;
-    struct List_Item *PreListItem;
-    void *Owner;
-    struct List *Container;
-} List_Item;
-
-typedef struct MiniList_Item
-{
-    uint64_t ItemValue;
-    struct List_Item *NextListItem;
-    struct List_Item *PreListItem;
-} MiniList_Item;
-
-typedef struct List
-{
-    uint64_t NumberOfList;
-    List_Item *Itemindex;
-    MiniList_Item ListEndItem;
-} List;
-
-typedef struct List *List_t;
+#include "os_config.h"
+#include "project_def.h"
+#include "../include/heap.h"
 
 #define ListGetHeadItem(List) (((List)->ListEndItem).NextListItem)
 #define ListGetItemValue(ListItem) ((ListItem)->ItemValue)
 
-/*列表创建函数*/
-rState ListCreat(List_t *List);
-/*列表静态创建函数*/
-rState ListCreatStatic(List_t List);
-/*列表项插入函数*/
-rState ListItemInsert(List_Item *ListItem, List_t List, uint64_t ItemValue);
-/*列表项删除函数*/
-rState ListItemRemove(List_Item *ListItem);
+struct ListItem
+{
+	uint64_t ItemValue;
+
+	pListItem_t NextListItem;
+	pListItem_t PreListItem;
+
+	void *Owner;
+	pList_t Container;
+};
+
+struct MiniListItem
+{
+	uint64_t ItemValue;
+
+	pListItem_t NextListItem;
+	pListItem_t PreListItem;
+};
+
+struct List
+{
+	uint64_t NumberOfList;
+
+	pListItem_t Itemindex;
+
+	MiniListItem_t ListEndItem;
+};
+
+typedef struct ListItem ListItem_t;
+typedef struct MiniListItem MiniListItem_t;
+typedef struct List List_t;
+
+typedef ListItem_t *pListItem_t;
+typedef List_t *pList_t;
+
+/**
+ * @brief  列表创建函数
+ * @param  List: 创建的列表
+ * @return xTRUE:创建成功
+ *         xFALSE:创建失败
+ * @note
+ */
+BaseState_t sListCreat(pList_t *List);
+
+/**
+ * @brief  静态列表创建函数
+ * @param  List: 创建的列表
+ * @return xTRUE:创建成功
+ *         xFALSE:创建失败
+ * @note
+ */
+BaseState_t sListCreatStatic(pList_t List);
+
+/**
+ * @brief  列表项插入函数
+ * @param  ListItem: 插入的列表项
+ * @param  List: 被插入的列表
+ * @param  ItemValue: 列表项的值
+ * @return xTRUE:插入成功
+ *         xFALSE:插入失败
+ * @note   列表项升序排列
+ */
+BaseState_t sListItemInsert(pListItem_t ListItem, pList_t List, uint64_t ItemValue);
+
+/**
+ * @brief  列表项删除函数
+ * @param  ListItem: 删除的列表项
+ * @return xTRUE:插入成功
+ *         xFALSE:插入失败
+ * @note
+ */
+BaseState_t sListItemRemove(pListItem_t ListItem);
 
 #endif
