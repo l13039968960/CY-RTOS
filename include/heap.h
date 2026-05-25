@@ -15,29 +15,42 @@
 #include "project_def.h"
 #include "list.h"
 
-#define Free_state 1
-#define Allocated_state 0
+/**
+ * @brief  栈元素类型
+ * @note   
+ */
+typedef uint32_t StackType_t;
+typedef StackType_t * pStackType_t;
 
-#define MEM_ALIGN_SIZE 0x0008
-#define MEM_ALIGN_MASK 0x0007
+/**
+ * @brief  内存控制块结构体
+ * @note   
+ */
+typedef struct HeapMemoryControlBlockHandler MCB_t;
 
-typedef uint32_t Mem_Type;
-typedef uint32_t *pMem_Type;
+/**
+ * @brief  内存分配函数
+ * @param  memsize: 分配内存大小(字节)
+ * @param  pHead: 分配的内存的首地址指针
+ * @retval pdTRUE:分配成功
+ *         pdFALSE:分配失败
+ * @note
+ */
+BaseState_t sHeapMemAllocate(uint32_t Memsize, pStackType_t *pHead);
 
-typedef struct MemoryControlBlock
-{
-    // uint8_t block_state;
-    uint64_t block_size;
-    uint32_t block_base_address;
-    List_Item MemoryListItem;
-} MCB;
+/**
+ * @brief  内存释放函数
+ * @param  MemAddress: 释放的内存首地址
+ * @retval  pdTRUE: 释放成功
+ *          pdFALSE: 释放失败
+ * @note
+ */
+BaseState_t sHeapMemFree(StackType_t *MemAddress);
 
-typedef MCB *MCB_t;
-/*内存分配*/
-rState MemAllocate(uint64_t Memsize, pMem_Type *pHead);
-/*内存释放*/
-rState MemFree(Mem_Type MemAddress);
-/*内存初始化*/
-void Heap_Init(void);
+/**
+ * @brief  堆栈内存初始化函数
+ * @note   只有OSInit会调用
+ */
+void vHeapInit(void);
 
 #endif
