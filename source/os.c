@@ -151,15 +151,18 @@ __asm void StartFirstTask(void)
 void StartTaskSchedluer(void)
 {
 
+	/*关中断*/
+	
+
     /*设置PendSV和Systick中断优先级为最低*/
     NVIC_PENDSV_SYSTICK_PRIORITY_REG |= (uint32_t)(__OS_Min_SYSInterrupt_Priority << 16) | (uint32_t)(__OS_Min_SYSInterrupt_Priority << 24);
 
     /*配置Systick*/
     NVIC_SYSTICK_CTRL_REG = 0;          // CTRL
-    NVIC_SYSTICK_LOAD_REG = 8000 - 1;   // LOAD
+    NVIC_SYSTICK_LOAD_REG = 9000 - 1;   // LOAD
     NVIC_SYSTICK_CURRENT_VALUE_REG = 0; // VAL
 
-    NVIC_SYSTICK_CURRENT_VALUE_REG = (0x0 << 2) | (0x1 << 1) | (0x1 << 0); // CTRL
+    NVIC_SYSTICK_CTRL_REG = (0x0 << 2) | (0x1 << 1) | (0x1 << 0); // CTRL
 
     /*临界区计数器初始化*/
     EnterCriticalCount = 0;
@@ -250,17 +253,18 @@ __asm void PortSVCHandler(void)
 
     ldr r0, =CurrentTCB     /*切换当前任务上下文*/
     ldr r1, [r0] 
-    ldr r2, [r1]
+    ldr r2, [r1]			/*获取栈顶指针*/
 
     ldmia r2!, {r4 - r11}   /*出栈r4-r11*/
 
-    msr psp, r2              /*psp重新赋值*/
+    msr psp, r2              /*任务堆栈重新赋值*/
+	dsb
     isb
 
     mov r0, #0              /*开中断*/
     msr basepri, r0
 
-    orr r14, # 0xd           /*设置异常返回值，返回到任务堆栈，线程模式*/
+    orr r14, # 0xd           /*设置异常返回值，返回到用户级线程模式*/
     bx r14
 }
 

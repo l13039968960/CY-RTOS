@@ -24,15 +24,15 @@ typedef pMem_Type pStack_Type;
 
 typedef struct
 {
-    pStack_Type Task_TopOfStack;
-    pMem_Type Task_Stack;
+    pStack_Type Task_TopOfStack;	/*任务栈顶*/
+    pMem_Type Task_Stack;			/*任务栈指针*/
 
-    uint8_t Task_Priority;
-    uint32_t Task_SizeOfStack;
-    TaskFunction Task_Fuction;
+    uint8_t Task_Priority;			/*任务优先级*/
+    uint32_t Task_SizeOfStack;		/*任务栈大小*/
+    TaskFunction Task_Fuction;		/*任务函数*/
 
-    List_Item StateListItem;
-    List_Item EventListItem;
+    List_Item StateListItem;		/*任务状态列表项*/
+    List_Item EventListItem;		/*任务事件列表项*/
 } TaskHandle;
 
 typedef TaskHandle *TaskHandle_t;
