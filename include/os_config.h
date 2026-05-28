@@ -1,11 +1,11 @@
 #ifndef __OS_CONFIG_H__
 #define __OS_CONFIG_H__
 
-#define Memstack_size 2048
+#define Memstack_size 1024
 
-#define PortSysTickHandler SysTick_Handler
-#define PortPendSVCHandler PendSV_Handler
-#define PortSVCHandler SVC_Handler
+#define vPortSysTickHandler SysTick_Handler
+#define vPortPendSVHandler PendSV_Handler
+#define vPortSVCHandler SVC_Handler
 
 #define __OS_Highest_Interrupt_Priority 5
 #define __OS_Lowest_Interrupt_Priority 15

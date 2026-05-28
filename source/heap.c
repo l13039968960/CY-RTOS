@@ -19,11 +19,11 @@ static uint8_t HeapMemstack[Memstack_size * sizeof(StackType_t)] __attribute__((
 /*空闲内存块列表*/
 static List_t FreeMemoryBlockList;
 
-static void FreeBlockMerge(MCB_t *RemoveBlock);
+static void vHeapBlockMerge(MCB_t *RemoveBlock);
 
 BaseState_t sHeapMemAllocate(uint32_t WantedBytes, pStackType_t *pHead)
 {
-	BaseState_t xreturn = sTRUE;
+	BaseState_t xreturn = pdTRUE;
 	MCB_t *NewMemBlock;
 	/*所需分配的字节数*/
 	WantedBytes += MCB_SturctSize;
@@ -47,7 +47,7 @@ BaseState_t sHeapMemAllocate(uint32_t WantedBytes, pStackType_t *pHead)
 			NewMemBlock->BlockSize = WantedBytes;
 			*pHead = (pStackType_t)((uint32_t)NewMemBlock + (uint32_t)MCB_SturctSize);
 			/*从空闲块列表中移除*/
-			ListItemRemove(&(NewMemBlock->MemoryBlockListItem));
+			sListItemRemove(&(NewMemBlock->MemoryBlockListItem), &FreeMemoryBlockList);
 			/*判断该内存块剩余大小可否再分为一个空闲块*/
 			if (ItemValue - WantedBytes >= MCB_SturctSize)
 			{
@@ -58,7 +58,7 @@ BaseState_t sHeapMemAllocate(uint32_t WantedBytes, pStackType_t *pHead)
 				NewMemBlock->BlockSize = ItemValue - WantedBytes;
 				/*新MCB列表项初始化*/
 				NewMemBlock->MemoryBlockListItem.Owner = (void *)NewMemBlock;
-				ListItemInsert(&(NewMemBlock->MemoryBlockListItem), &FreeMemoryBlockList, NewMemAddr);
+				sListItemInsert(&(NewMemBlock->MemoryBlockListItem), &FreeMemoryBlockList, NewMemAddr);
 			}
 			else
 			{
@@ -68,14 +68,14 @@ BaseState_t sHeapMemAllocate(uint32_t WantedBytes, pStackType_t *pHead)
 		else
 		{
 			/*没有找到满足条件的空闲内存块*/
-			xreturn = sFALSE;
+			xreturn = pdFALSE;
 			*pHead = NULL;
 		}
 	}
 	else
 	{
 		/*所需内存大小不符合要求*/
-		xreturn = sFALSE;
+		xreturn = pdFALSE;
 		*pHead = NULL;
 	}
 	return xreturn;
@@ -88,7 +88,7 @@ BaseState_t sHeapMemFree(StackType_t *MemAddress)
 	WillFreeBlock = (MCB_t *)((uint32_t)MemAddress - (uint32_t)MCB_SturctSize);
 	pListItem_t pListItem = &(WillFreeBlock->MemoryBlockListItem);
 	/*插入到空闲内存块列表*/
-	ListItemInsert(pListItem, &FreeMemoryBlockList, pListItem->ItemValue);
+	sListItemInsert(pListItem, &FreeMemoryBlockList, pListItem->ItemValue);
 
 	/*获取前一空闲块*/
 	PreMemoryBlock = pListItem->PreListItem != (pListItem_t)&(FreeMemoryBlockList.ListEndItem) ? (MCB_t *)pListItem->PreListItem->Owner : NULL;
@@ -97,18 +97,18 @@ BaseState_t sHeapMemFree(StackType_t *MemAddress)
 
 	/*是否可以和前一个空闲块合并*/
 	if ((PreMemoryBlock != NULL) && (PreMemoryBlock->BlockBaseIdx + PreMemoryBlock->BlockSize == WillFreeBlock->BlockBaseIdx))
-		FreeBlockMerge(WillFreeBlock);
+		vHeapBlockMerge(WillFreeBlock);
 	/*是否可以和后一个空闲块合并 */
 	if ((NextMemoryBlock != NULL) && (WillFreeBlock->BlockBaseIdx + WillFreeBlock->BlockSize == NextMemoryBlock->BlockBaseIdx))
-		FreeBlockMerge(NextMemoryBlock);
+		vHeapBlockMerge(NextMemoryBlock);
 		
-	return sTRUE;
+	return pdTRUE;
 }
 
 void vHeapInit(void)
 {
 	/*初始化空闲内存块列表*/
-	ListCreatStatic(&FreeMemoryBlockList);
+	sListCreatStatic(&FreeMemoryBlockList);
 
 	/*初始化第一个空闲内存块*/
 	MCB_t *FirstFreeBlock = (MCB_t *)&HeapMemstack;
@@ -121,7 +121,7 @@ void vHeapInit(void)
 	FirstFreeBlock->MemoryBlockListItem.Owner = (void *)FirstFreeBlock;
 
 	/*插入空闲内存块列表*/
-	ListItemInsert(&(FirstFreeBlock->MemoryBlockListItem), &FreeMemoryBlockList, 0);
+	sListItemInsert(&(FirstFreeBlock->MemoryBlockListItem), &FreeMemoryBlockList, 0);
 }
 
 /**
@@ -129,10 +129,11 @@ void vHeapInit(void)
  * @param  RemoveBlock: 要删除的内存块
  * @note   将后一个内存块合并给前一个
  */
-static void FreeBlockMerge(MCB_t *RemoveBlock)
+static void vHeapBlockMerge(MCB_t *RemoveBlock)
 {
 	/*更改合并后的内存块大小*/
 	((MCB_t *)(((&(RemoveBlock->MemoryBlockListItem))->PreListItem)->Owner))->BlockSize += RemoveBlock->BlockSize;
 	/*删除内存块*/
-	ListItemRemove(&(RemoveBlock->MemoryBlockListItem));
+	sListItemRemove(&(RemoveBlock->MemoryBlockListItem), &FreeMemoryBlockList);
 }
+

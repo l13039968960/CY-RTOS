@@ -22,25 +22,24 @@
 #define MEM_ALIGN_SIZE 0x0008
 #define MEM_ALIGN_MASK 0x0007
 
-static void vTaskStackInit(pTCB_t TCB);
+static BaseType_t vTaskStackInit(pTCB_t TCB);
 
 BaseState_t sTaskCreate(pTCB_t *TCB, TaskFunction Task_Fuction, uint8_t Task_Priority, uint32_t Task_SizeOfStack)
 {
 	extern BaseState_t TaskStackInit(pTCB_t TCB);
 
-	// EnterCritical();
-	BaseState_t xreturn = sTRUE, xstate;
+	BaseState_t xstate;
 	pStackType_t Stack;
 	pTCB_t pTCB;
 
 	/*分配栈空间*/
 	xstate = sHeapMemAllocate(Task_SizeOfStack * 4, &Stack);
-	if (xstate != sFALSE)
+	if (xstate != pdFALSE)
 	{
 		/*分配栈空间成功*/
 		/*分配任务控制块空间*/
 		xstate = sHeapMemAllocate(sizeof(TCB_t), (pStackType_t *)&pTCB);
-		if (xstate != sFALSE)
+		if (xstate != pdFALSE)
 		{
 			/*分配任务控制块成功*/
 			*TCB = pTCB;
@@ -50,19 +49,11 @@ BaseState_t sTaskCreate(pTCB_t *TCB, TaskFunction Task_Fuction, uint8_t Task_Pri
 			(*TCB)->Task_SizeOfStack = Task_SizeOfStack;
 			(*TCB)->Task_Fuction = Task_Fuction;
 
-			// /*判断当前任务最高优先级是否变化*/
-			// if (Task_Priority > CurrentHihgestTaskPriority)
-			// {
-			// 	CurrentHihgestTaskPriority = Task_Priority;
-
-			// 	if (TaskSchedulerState == Running)
-			// 		PendTaskSwitch();
-			// }
-
 			/*任务堆栈初始化*/
 			(*TCB)->Task_Stack = Stack;
-			TaskStackInit(*TCB);
-
+			vTaskStackInit(*TCB);
+			
+			/*任务列表项初始化*/
 			(*TCB)->TaskListItem.Container = NULL;
 			(*TCB)->TaskListItem.ItemValue = 0;
 			(*TCB)->TaskListItem.NextListItem = NULL;
@@ -73,62 +64,32 @@ BaseState_t sTaskCreate(pTCB_t *TCB, TaskFunction Task_Fuction, uint8_t Task_Pri
 		{
 			/*分配任务控制块失败，释放分配的栈空间*/
 			sHeapMemFree(Stack);
-			xreturn = sFALSE;
+			return pdFALSE;
 		}
 	}
 	else
 	{
 		/*分配栈空间失败*/
-		xreturn = sFALSE;
+		return pdFALSE;
 	}
-
-	// ExitCritical();
-	return xreturn;
+	return pdTRUE;
 }
 
 BaseState_t sTaskDelete(pTCB_t TCB)
 {
-	// /*进入临界区*/
-	// EnterCritical();
-
-	BaseState_t xreturn = sTRUE;
 	BaseState_t xstate;
-	// /*为空即为删除当前任务*/
-	// if (TCB == NULL)
-	// {
-	// 	TCB = CurrentTCB;
-
-	// 	if (TaskSchedulerState == Running)
-	// 		PendTaskSwitch(); /*挂起任务切换中断*/
-	// }
-
-	/*移除任务列表*/
-	TaskRemoveFromStateList(TCB);
-	TaskRemoveFromEventList(TCB);
-
-	// /*判断是否需要切换当前任务最高优先级*/
-	// if (TCB->Task_Priority == CurrentHihgestTaskPriority)
-	// {
-	// 	if (ReadyTaskList[CurrentHihgestTaskPriority].NumberOfList == 0)
-	// 	{
-	// 		TaskCurrentHighestTaskPriority_Switch();
-	// 	}
-	// }
 
 	/*释放栈空间*/
 	xstate = sHeapMemFree(TCB->Task_Stack);
-	if (xstate != sTRUE)
-		xreturn = sFALSE;
+	if (xstate != pdTRUE)
+		return pdFALSE;
 
 	/*释放任务控制块*/
 	xstate = sHeapMemFree((StackType_t *)TCB);
-	if (xstate != sTRUE)
-		xreturn = sFALSE;
+	if (xstate != pdTRUE)
+		return pdFALSE;
 
-	// /*退出临界区*/
-	// ExitCritical();
-
-	return xreturn;
+	return pdTRUE;
 }
 
 /**
@@ -138,7 +99,7 @@ BaseState_t sTaskDelete(pTCB_t TCB)
  *          pdFALSE: 创建失败
  * @note
  */
-static void vTaskStackInit(pTCB_t TCB)
+static BaseType_t vTaskStackInit(pTCB_t TCB)
 {
 	__is_null__(TCB);
 
@@ -166,5 +127,5 @@ static void vTaskStackInit(pTCB_t TCB)
 	/*更新栈顶指针*/
 	TCB->Task_TopOfStack = TopOfStack;
 
-	return sTRUE;
+	return pdTRUE;
 }

@@ -1,269 +1,387 @@
 /*************************************************************************
  * @file     : os_.c
- * @brief    : 中断/系统相关函数
+ * @brief    : 系统调度相关函数
  * @author   : zw1194
  * @date     : 2026-02-21
  * @version  : V1.0
  * @copyright:
  * @note     :
  *************************************************************************/
-#include "../include/os_config.h"
-#include "../include/project_def.h"
-#include "../include/task.h"
-#include "../include/heap.h"
+#include "../include/os.h"
 
-#include "stdint.h"
-#include "string.h"
+#define OSstop 0
+#define OSpending 1
+#define OSrunning 2
 
-#include "stm32f1xx_hal.h"
+typedef uint8_t OSSchedulerState_t;
 
-#define SCB_ICS_REG (*((volatile uint32_t *)0xE000ED04))
+pTCB_t OSCurrentTCB;						/*当前任务TCB*/
+static OSSchedulerState_t OSSchedulerState; /*任务调度器状态*/
 
-#define NVIC_PENDSV_SYSTICK_PRIORITY_REG (*((volatile uint32_t *)0xE000ED20))
+static BaseType_t CurrentHihgestTaskPriority;
+static BaseType_t OSCurrentTick;	   /*当前定时器计数器*/
+static BaseType_t NextDelayedTaskTick; /*下一任务阻塞超时时间*/
+static List_t ReadyTaskList[32];	   /*就绪任务列表*/
+static List_t DelayTaskList;		   /*延时阻塞任务列表*/
+static BaseType_t OSCriticalCount;	   /*临界区计数器*/
 
-#define NVIC_SYSTICK_CTRL_REG (*((volatile uint32_t *)0xe000e010))
-#define NVIC_SYSTICK_LOAD_REG (*((volatile uint32_t *)0xe000e014))
-#define NVIC_SYSTICK_CURRENT_VALUE_REG (*((volatile uint32_t *)0xe000e018))
+static pTCB_t IdleTaskHandler;
+static void IdleTaskFunction(void *paramter); /*空闲任务*/
+static OSTaskDefType_t IdleTaskDef = {.Task_Priority = __OS_TASK_LOWEST_PRIORITY__, .Task_SizeOfStack = __OS_TASK_MINIMUN_STACKSIZE__, .Task_Fuction = IdleTaskFunction};
 
-static uint32_t EnterCriticalCount;
+static pTCB_t StartTaskHandler;				   /*开始任务句柄*/
+static void StartTaskFunction(void *paramter); /*开始任务*/
+static OSTaskDefType_t StartTaskDef = {.Task_Priority = __OS_TASK_HIGHEST_PRIORITY__, .Task_SizeOfStack = __OS_TASK_MINIMUN_STACKSIZE__, .Task_Fuction = StartTaskFunction};
 
-/**
- * @brief  任务栈初始化函数
- * @param  TCB: 任务句柄
- * @return  pdTRUE: 创建成功
- *          pdFALSE: 创建失败
- * @note
- */
-rState TaskStackInit(TaskHandle_t TCB)
+void vOSSwitchTCB(void);
+static void vOSStartFirstTask(void);
+static void vOSSwitchHighestPriority(void);
+
+void vOSSchedulerStart(void)
 {
-//    __is_null__(TCB);
+	extern void vPortSchedluerStart(void);
 
-    extern void TaskExitError(void);
+	/*初始化就绪任务列表、延时阻塞任务列表*/
+	sListCreatStatic(&DelayTaskList);
+	for (uint8_t i = 0; i < 32; i++)
+		sListCreatStatic(&ReadyTaskList[i]);
 
-    /*获取任务栈顶*/
-    pStack_Type TopOfStack = (pStack_Type)((uint32_t)TCB->Task_Stack + TCB->Task_SizeOfStack * sizeof(uint32_t));
+	/*初始化堆空间*/
+	vHeapInit();
 
-    /*满足8字节对齐*/
-    TopOfStack = (pStack_Type)(((uint32_t)TopOfStack + MEM_ALIGN_MASK) & ~(MEM_ALIGN_MASK));
+	/*创建空闲任务*/
+	sOSTaskCreate(&IdleTaskHandler, &IdleTaskDef);
+	/*创建开始任务*/
+	sOSTaskCreate(&StartTaskHandler, &StartTaskDef);
 
-    /*初始化栈空间*/
-    memset((void *)TCB->Task_Stack, 0xa5, TCB->Task_SizeOfStack * sizeof(uint32_t));
+	/*初始化运行变量*/
+	OSCurrentTCB = NULL;
+	OSSchedulerState = OSrunning;
+	OSCurrentTick = 0;
+	NextDelayedTaskTick = MaxDelayTime;
+	OSCriticalCount = 0;
 
-    /*寄存器入栈*/
-    TopOfStack--;
-    *TopOfStack = (Mem_Type)0x01000000; // PSR
-    TopOfStack--;
-    *TopOfStack = (Mem_Type)TCB->Task_Fuction; // PC
-    TopOfStack--;
-    *TopOfStack = (Mem_Type)TaskExitError; // LR
-    TopOfStack -= 5;                       // R12,R3,R2,R1,R0
-    TopOfStack -= 8;                       // R11,R10,R9,R8,R7,R6,R5,R4
+	/*切换任务TCB*/
+	vOSSwitchTCB();
 
-    /*更新栈顶指针*/
-    TCB->Task_TopOfStack = TopOfStack;
+	/*底层配置初始化*/
+	vPortSchedluerStart();
 
-    return pdTRUE;
+	/*开启第一个任务*/
+	vOSStartFirstTask();
 }
 
-/**
- * @brief  关中断
- * @note  
- */
-void RASIE_Basepri(void)
+void vOSSchedulerSuspend(void)
 {
-    __asm
-    {
-        msr basepri, #80
-
-        dsb
-        isb
-    }
 }
 
-/**
- * @brief  开中断
- * @note  
- */
-void Clear_Basepri(void)
+void vOSSchedulerStop(void)
 {
-    __asm
-    {
-        msr basepri, #0
-
-        dsb
-        isb
-    }
 }
 
-/**
- * @brief  进入临界区
- * @note  
- */
-void EnterCritical(void)
+void vOSPendSVpending(void)
 {
-    RASIE_Basepri();
+	extern void vPortPendTaskSwitch(void);
 
-    EnterCriticalCount++;
+	if (OSSchedulerState == OSrunning)
+		vPortPendTaskSwitch();
 }
 
-/**
- * @brief  退出临界区
- * @note  
- */
-void ExitCritical(void)
+void vOSEnterCritical(void)
 {
-    EnterCriticalCount--;
+	extern void vPortRASIEBasepri(void);
 
-    if (EnterCriticalCount <= 0)
-    {
-        Clear_Basepri();
-    }
+	vPortRASIEBasepri();
+
+	OSCriticalCount++;
+}
+
+void vOSExitCritical(void)
+{
+	extern void vPortClearBasepri(void);
+
+	OSCriticalCount--;
+
+	if (OSCriticalCount <= 0)
+	{
+		vPortClearBasepri();
+	}
+}
+
+void vOSDelay(BaseType_t DelayTick)
+{
+	BaseType_t BlockTick = OSCurrentTick + DelayTick;
+
+	vOSEnterCritical();
+
+	/*更新下一解锁时间*/
+	if (BlockTick < NextDelayedTaskTick)
+	{
+		NextDelayedTaskTick = BlockTick;
+	}
+
+	/*挂起任务切换中断*/
+	vOSPendSVpending();
+
+	/*从就绪列表中移除*/
+	sListItemRemove(&(OSCurrentTCB->TaskListItem), &ReadyTaskList[OSCurrentTCB->Task_Priority]);
+
+	/*判断是否需要切换当前任务最高优先级*/
+	if (OSCurrentTCB->Task_Priority == CurrentHihgestTaskPriority)
+		vOSSwitchHighestPriority();
+
+	/*添加到延时阻塞列表*/
+	sListItemInsert(&(OSCurrentTCB->TaskListItem), &DelayTaskList, BlockTick);
+
+	vOSExitCritical();
+}
+
+BaseState_t sOSTaskCreate(pTCB_t *TaskHandler, pOSTaskDefType_t TaskDefStructure)
+{
+	BaseState_t xstate;
+
+	vOSEnterCritical();
+
+	xstate = sTaskCreate(TaskHandler, TaskDefStructure->Task_Fuction, TaskDefStructure->Task_Priority, TaskDefStructure->Task_SizeOfStack);
+	if (xstate != pdTRUE)
+		return pdFALSE;
+
+	xstate = sListItemInsert(&((*TaskHandler)->TaskListItem), &ReadyTaskList[(*TaskHandler)->Task_Priority], (*TaskHandler)->Task_Priority);
+	if (xstate != pdTRUE)
+		return pdFALSE;
+
+	/*判断当前任务最高优先级是否变化*/
+	if (TaskDefStructure->Task_Priority > CurrentHihgestTaskPriority)
+	{
+		CurrentHihgestTaskPriority = TaskDefStructure->Task_Priority;
+
+		/*触发任务调度*/
+		vOSPendSVpending();
+	}
+
+	vOSExitCritical();
+
+	return pdTRUE;
+}
+
+BaseState_t sOSTaskDelete(pTCB_t TaskHandler)
+{
+	BaseState_t xstate;
+
+	vOSEnterCritical();
+
+	if (TaskHandler == NULL)
+	{
+		TaskHandler = OSCurrentTCB;
+		/*触发任务调度*/
+		vOSPendSVpending();
+	}
+
+	/*从列表中移除列表项*/
+	xstate = sListItemRemove(&(TaskHandler->TaskListItem), TaskHandler->TaskListItem.Container);
+	if (xstate != pdTRUE)
+		return pdFALSE;
+
+	/*删除任务*/
+	xstate = sTaskDelete(TaskHandler);
+	if (xstate != pdTRUE)
+		return pdFALSE;
+
+	/*判断是否需要切换当前任务最高优先级*/
+	if (TaskHandler->Task_Priority == CurrentHihgestTaskPriority)
+		vOSSwitchHighestPriority();
+
+	vOSExitCritical();
+
+	return pdTRUE;
 }
 
 /**
  * @brief  开启第一个任务
  * @note
  */
-__asm void StartFirstTask(void)
+void vOSStartFirstTask(void)
 {
-    PRESERVE8
+	extern void vPortStartFirstTask(void);
 
-    ldr r0, =0xE000ED08 /*从向量表重新加载主堆栈指针*/
-    ldr r0, [r0] 
-    ldr r0, [r0]
-
-    msr msp, r0 /*重新加载msp*/
-
-    cpsie i /*开中断*/
-    cpsie f 
-    dsb 
-    isb
-
-    svc 0 /*触发SVC中断*/
-    nop 
-    nop
+	vPortStartFirstTask();
 }
 
 /**
- * @brief  底层配置开启任务调度器
- * @note  
+ * @brief  Tick递增函数,判断是否需要任务切换
+ * @return  pdTRUE: 需要任务切换
+ *          pdFALSE: 不需要任务切换
+ * @note
  */
-void StartTaskSchedluer(void)
+BaseState_t sOSIncrementTick(void)
 {
+	/*变量定义*/
+	pTCB_t TCB;
+	BaseType_t ItemValue;
+	pListItem_t DelayListItem;
+	static BaseType_t StaticTick = 0;
+	BaseState_t xreturn = pdFALSE;
+	/*计数器加一*/
+	OSCurrentTick += 1;
+	StaticTick += 1;
+	/*当前计数器大于等于下一个任务解锁时间*/
+	if (OSCurrentTick >= NextDelayedTaskTick)
+	{
+		/*遍历所有满足条件节点*/
+		while (1)
+		{
+			/*延时列表索引节点*/
+			sListGetIndexItem(&DelayTaskList, &DelayListItem);
+			if (DelayListItem == NULL)
+			{
+				/*首节点为空，下一个任务解释时间为最大延时时间*/
+				NextDelayedTaskTick = MaxDelayTime;
+				break;
+			}
+			else
+			{
+				/*获取任务控制块和延时时间*/
+				TCB = (pTCB_t)(DelayListItem->Owner);
+				ItemValue = DelayListItem->ItemValue;
 
-    /*设置PendSV和Systick中断优先级为最低*/
-    NVIC_PENDSV_SYSTICK_PRIORITY_REG |= (uint32_t)(__OS_Min_SYSInterrupt_Priority << 16) | (uint32_t)(__OS_Min_SYSInterrupt_Priority << 24);
+				if (OSCurrentTick < ItemValue)
+				{
+					/*当前计时器小于延时时间，更新下一任务解锁时间*/
+					NextDelayedTaskTick = ItemValue;
+					break;
+				}
+				else
+				{
+					/*当前计时器大于等于延时时间*/
+					/*从延时列表移除*/
+					sListItemRemove(DelayListItem, &DelayTaskList);
 
-    /*配置Systick*/
-    NVIC_SYSTICK_CTRL_REG = 0;          // CTRL
-    NVIC_SYSTICK_LOAD_REG = 8000 - 1;   // LOAD
-    NVIC_SYSTICK_CURRENT_VALUE_REG = 0; // VAL
-
-    NVIC_SYSTICK_CURRENT_VALUE_REG = (0x0 << 2) | (0x1 << 1) | (0x1 << 0); // CTRL
-
-    /*临界区计数器初始化*/
-    EnterCriticalCount = 0;
-
-    /*加载第一个任务*/
-    StartFirstTask();
-}
-
-/**
- * @brief  停止任务调度器
- * @note  
- */
-void EndTaskScheduler(void)
-{
-}
-
-/**
- * @brief  触发PendSV中断函数
- * @note  
- */
-void PendTaskSwitch(void)
-{
-    SCB_ICS_REG = 0x10000000; /*写寄存器触发PendSV中断*/
+					/*插入就绪列表*/
+					sListItemInsert(DelayListItem, &ReadyTaskList[TCB->Task_Priority], TCB->Task_Priority);
+					if (TCB->Task_Priority > OSCurrentTCB->Task_Priority)
+					{
+						CurrentHihgestTaskPriority = TCB->Task_Priority;
+						/*优先级大于当前任务优先级，进行任务转换*/
+						xreturn = pdTRUE;
+					}
+				}
+			}
+		}
+	}
+	else
+	{
+		if (StaticTick == 10)
+		{
+			StaticTick = 0;
+			xreturn = pdTRUE;
+		}
+		else
+		{
+			xreturn = pdFALSE;
+		}
+	}
+	return xreturn;
 }
 
 /**
  * @brief  Systick中断
- * @note   每1ms触发一次，判断是否需要任务切换
+ * @note   每一Tick触发一次，判断是否需要任务切换
  */
-void PortSysTickHandler(void)
+void vPortSysTickHandler(void)
 {
-    HAL_IncTick();
-    if (TaskIncrementTick() == pdTRUE)
-    {
-        PendTaskSwitch();
-    }
-}
-/**
- * @brief  PendSV中断
- * @note   实现任务切换和上下文保存与回复
- */
-__asm void PortPendSVCHandler(void)
-{
-    extern TaskSwitchTCB
-    extern CurrentTCB
-
-    PRESERVE8
-
-    mrs r0, psp                                     /*加载进程堆栈指针到r0*/
-    isb 
-    stmdb r0!, {r4 - r11}                           /*旧任务r4-r11入栈*/
-
-    ldr r1, =CurrentTCB                             /*将入栈后的栈顶保存到旧任务中*/
-    ldr r2, [r1] 
-    str r0, [r2]
-
-    stmdb sp!, {r1, r14}                             /*保存r1，lr*/
-    mov r0, #80 
-    msr basepri, r0                                 /*关中断*/
-    dsb
-    isb
-    bl TaskSwitchTCB                                /*任务控制块切换*/
-    mov r0, #0 
-    msr basepri, r0                                 /*开中断*/
-    dsb
-    isb
-    ldmia sp!, {r1, r14}                              /*出栈r1，lr*/
-
-    ldr r2, [r1]                                    /*加载新任务栈顶*/
-    ldr r0, [r2] 
-    ldmia r0!, {r4 - r11}                           /*出栈新任务的r4-r11*/
-
-    msr psp, r0                                     /*保存新任务栈顶到进程堆栈*/
-    isb
-    bx r14
-    nop
+	// HAL_IncTick();
+	if (sOSIncrementTick() == pdTRUE)
+	{
+		vOSPendSVpending();
+	}
 }
 
 /**
- * @brief  SVC中断
- * @note    在第一次启动任务调度器时调用
+ * @brief  任务错误退出函数
+ * @note
  */
-__asm void PortSVCHandler(void)
+void TaskExitError(void)
 {
-    extern CurrentTCB
+	vOSEnterCritical();
+	printf("ERROR!!!\r\n");
 
-    PRESERVE8
-
-    ldr r0, =CurrentTCB     /*切换当前任务上下文*/
-    ldr r1, [r0] 
-    ldr r2, [r1]
-
-    ldmia r2!, {r4 - r11}   /*出栈r4-r11*/
-
-    msr psp, r2              /*psp重新赋值*/
-    isb
-
-    mov r0, #0              /*开中断*/
-    msr basepri, r0
-
-    orr r14, # 0xd           /*设置异常返回值，返回到任务堆栈，线程模式*/
-    bx r14
+	while (1)
+	{
+	}
 }
 
+/**
+ * @brief  切换最高优先级就绪任务函数并更新索引
+ * @note
+ */
+void vOSSwitchTCB(void)
+{
+	pListItem_t ListItem;
+	sListGetIndexItem(&ReadyTaskList[CurrentHihgestTaskPriority], &ListItem);
+	if (ListItem != NULL)
+		OSCurrentTCB = (pTCB_t)ListItem->Owner;
+}
 
+/**
+ * @brief  空闲任务函数
+ * @note
+ */
+static void IdleTaskFunction(void *paramter)
+{
+	while (1)
+	{
+	}
+}
 
+static uint32_t test1 = 0;
+void TestTask1_f(void *paramter)
+{
+	while (1)
+	{
+		test1++;
+	}
+}
+OSTaskDefType_t TestTask1 = {.Task_Fuction = TestTask1_f, .Task_Priority = 1, .Task_SizeOfStack = __OS_TASK_MINIMUN_STACKSIZE__};
+pTCB_t TestTask1Handler;
 
+static uint32_t test2 = 0;
+void TestTask2_f(void *paramter)
+{
+	while (1)
+	{
+		test2++;
+	}
+}
+OSTaskDefType_t TestTask2 = {.Task_Fuction = TestTask2_f, .Task_Priority = 1, .Task_SizeOfStack = __OS_TASK_MINIMUN_STACKSIZE__};
+pTCB_t TestTask2Handler;
+
+/**
+ * @brief  开始任务函数
+ * @note
+ */
+static void StartTaskFunction(void *paramter)
+{
+	sOSTaskCreate(&TestTask1Handler, &TestTask1);
+	sOSTaskCreate(&TestTask2Handler, &TestTask2);
+
+	sOSTaskDelete(NULL);
+	while (1)
+	{
+	}
+}
+
+/**
+ * @brief  切换系统当前任务最高优先级
+ * @note
+ */
+static void vOSSwitchHighestPriority(void)
+{
+	for (int8_t i = 31; i >= 0; i--)
+	{
+		if (ReadyTaskList[i].NumberOfList > 0)
+		{
+			CurrentHihgestTaskPriority = i;
+			break;
+		}
+	}
+}

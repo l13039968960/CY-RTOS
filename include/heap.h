@@ -5,7 +5,7 @@
  * @date     : 2026-02-21
  * @version  : V1.0
  * @copyright:
- * @note     :
+ * @note     : 采用首次适用算法
  *************************************************************************/
 
 #ifndef __HEAP_H__
@@ -13,7 +13,7 @@
 
 #include "os_config.h"
 #include "project_def.h"
-#include "../include/list.h"
+#include "list.h"
 
 /**
  * @brief  内存控制块结构体

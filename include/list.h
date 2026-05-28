@@ -13,37 +13,37 @@
 
 #include "os_config.h"
 #include "project_def.h"
-#include "../include/heap.h"
 
-#define ListGetHeadItem(List) (((List)->ListEndItem).NextListItem)
-#define ListGetItemValue(ListItem) ((ListItem)->ItemValue)
+#define sListGetHeadItem(List) (((List)->ListEndItem).NextListItem)
+#define sListGetItemValue(ListItem) ((ListItem)->ItemValue)
 
+struct List;
 struct ListItem
 {
 	uint64_t ItemValue;
 
-	pListItem_t NextListItem;
-	pListItem_t PreListItem;
+	struct ListItem *NextListItem;
+	struct ListItem *PreListItem;
 
 	void *Owner;
-	pList_t Container;
+	struct List *Container;
 };
 
 struct MiniListItem
 {
 	uint64_t ItemValue;
 
-	pListItem_t NextListItem;
-	pListItem_t PreListItem;
+	struct ListItem *NextListItem;
+	struct ListItem *PreListItem;
 };
 
 struct List
 {
 	uint64_t NumberOfList;
 
-	pListItem_t Itemindex;
+	struct ListItem *Itemindex;
 
-	MiniListItem_t ListEndItem;
+	struct MiniListItem ListEndItem;
 };
 
 typedef struct ListItem ListItem_t;
@@ -52,6 +52,8 @@ typedef struct List List_t;
 
 typedef ListItem_t *pListItem_t;
 typedef List_t *pList_t;
+
+#include "heap.h"
 
 /**
  * @brief  列表创建函数
@@ -80,7 +82,7 @@ BaseState_t sListCreatStatic(pList_t List);
  *         xFALSE:插入失败
  * @note   列表项升序排列
  */
-BaseState_t sListItemInsert(pListItem_t ListItem, pList_t List, uint64_t ItemValue);
+BaseState_t sListItemInsert(pListItem_t ListItem, pList_t List, BaseType_t ItemValue);
 
 /**
  * @brief  列表项删除函数
@@ -89,6 +91,23 @@ BaseState_t sListItemInsert(pListItem_t ListItem, pList_t List, uint64_t ItemVal
  *         xFALSE:插入失败
  * @note
  */
-BaseState_t sListItemRemove(pListItem_t ListItem);
+BaseState_t sListItemRemove(pListItem_t ListItem, pList_t List);
+
+/**
+ * @brief  列表索引项切换为下一个列表项
+ * @param  List: 列表
+ * @return BaseState_t
+ * @note
+ */
+BaseState_t sListIndexToNext(pList_t List);
+
+/**
+ * @brief  获取列表索引列表项
+ * @param  List: 列表
+ * @param  ListItem:列表项指针
+ * @return BaseState_t
+ * @note   ListItem为NULL代表列表为空
+ */
+BaseState_t sListGetIndexItem(pList_t List, pListItem_t* ListItem);
 
 #endif

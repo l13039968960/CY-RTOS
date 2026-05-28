@@ -33,10 +33,10 @@ typedef TCB_t *pTCB_t;
 
 /**
  * @brief  任务创建函数
- * @param  taskhandle: 任务句柄
- * @param  taskfuction: 任务函数
- * @param  task_priority: 任务优先级
- * @param  task_stack_size: 任务栈大小(字)
+ * @param  TCB: 任务句柄
+ * @param  Task_Fuction: 任务函数
+ * @param  Task_Priority: 任务优先级
+ * @param  Task_SizeOfStack: 任务栈大小(字)
  * @return  pdTRUE: 创建成功
  *          pdFALSE: 创建失败
  * @note
