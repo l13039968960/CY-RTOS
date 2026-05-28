@@ -33,6 +33,8 @@ static pTCB_t StartTaskHandler;				   /*开始任务句柄*/
 static void StartTaskFunction(void *paramter); /*开始任务*/
 static OSTaskDefType_t StartTaskDef = {.Task_Priority = __OS_TASK_HIGHEST_PRIORITY__, .Task_SizeOfStack = __OS_TASK_MINIMUN_STACKSIZE__, .Task_Fuction = StartTaskFunction};
 
+static List_t OSPendDeleteTaskList;
+
 void vOSSwitchTCB(void);
 static void vOSStartFirstTask(void);
 static void vOSSwitchHighestPriority(void);
@@ -170,26 +172,38 @@ BaseState_t sOSTaskDelete(pTCB_t TaskHandler)
 
 	vOSEnterCritical();
 
-	if (TaskHandler == NULL)
+	if (TaskHandler == NULL || TaskHandler == OSCurrentTCB)
 	{
 		TaskHandler = OSCurrentTCB;
+
+		/*从列表中移除列表项*/
+		xstate = sListItemRemove(&(TaskHandler->TaskListItem), TaskHandler->TaskListItem.Container);
+		if (xstate != pdTRUE)
+			return pdFALSE;
+
+		/*插入延迟删除列表*/
+		xstate = sListItemInsert(&(TaskHandler->TaskListItem), &OSPendDeleteTaskList, 0);
+		if (xstate != pdTRUE)
+			return pdFALSE;
 		/*触发任务调度*/
 		vOSPendSVpending();
 	}
+	else
+	{
+		/*从列表中移除列表项*/
+		xstate = sListItemRemove(&(TaskHandler->TaskListItem), TaskHandler->TaskListItem.Container);
+		if (xstate != pdTRUE)
+			return pdFALSE;
 
-	/*从列表中移除列表项*/
-	xstate = sListItemRemove(&(TaskHandler->TaskListItem), TaskHandler->TaskListItem.Container);
-	if (xstate != pdTRUE)
-		return pdFALSE;
+		/*删除任务*/
+		xstate = sTaskDelete(TaskHandler);
+		if (xstate != pdTRUE)
+			return pdFALSE;
 
-	/*删除任务*/
-	xstate = sTaskDelete(TaskHandler);
-	if (xstate != pdTRUE)
-		return pdFALSE;
-
-	/*判断是否需要切换当前任务最高优先级*/
-	if (TaskHandler->Task_Priority == CurrentHihgestTaskPriority)
-		vOSSwitchHighestPriority();
+		/*判断是否需要切换当前任务最高优先级*/
+		if (TaskHandler->Task_Priority == CurrentHihgestTaskPriority)
+			vOSSwitchHighestPriority();
+	}
 
 	vOSExitCritical();
 
@@ -328,32 +342,37 @@ void vOSSwitchTCB(void)
  */
 static void IdleTaskFunction(void *paramter)
 {
+	sListCreatStatic(&OSPendDeleteTaskList);
+	pListItem_t NextListItem;
 	while (1)
 	{
+		sListGetIndexItem(&OSPendDeleteTaskList, &NextListItem);
+		if (NextListItem != NULL)
+			sOSTaskDelete((pTCB_t)(NextListItem->Owner));
 	}
 }
 
-static uint32_t test1 = 0;
-void TestTask1_f(void *paramter)
-{
-	while (1)
-	{
-		test1++;
-	}
-}
-OSTaskDefType_t TestTask1 = {.Task_Fuction = TestTask1_f, .Task_Priority = 1, .Task_SizeOfStack = __OS_TASK_MINIMUN_STACKSIZE__};
-pTCB_t TestTask1Handler;
+// static uint32_t test1 = 0;
+// void TestTask1_f(void *paramter)
+// {
+// 	while (1)
+// 	{
+// 		test1++;
+// 	}
+// }
+// OSTaskDefType_t TestTask1 = {.Task_Fuction = TestTask1_f, .Task_Priority = 1, .Task_SizeOfStack = __OS_TASK_MINIMUN_STACKSIZE__};
+// pTCB_t TestTask1Handler;
 
-static uint32_t test2 = 0;
-void TestTask2_f(void *paramter)
-{
-	while (1)
-	{
-		test2++;
-	}
-}
-OSTaskDefType_t TestTask2 = {.Task_Fuction = TestTask2_f, .Task_Priority = 1, .Task_SizeOfStack = __OS_TASK_MINIMUN_STACKSIZE__};
-pTCB_t TestTask2Handler;
+// static uint32_t test2 = 0;
+// void TestTask2_f(void *paramter)
+// {
+// 	while (1)
+// 	{
+// 		test2++;
+// 	}
+// }
+// OSTaskDefType_t TestTask2 = {.Task_Fuction = TestTask2_f, .Task_Priority = 1, .Task_SizeOfStack = __OS_TASK_MINIMUN_STACKSIZE__};
+// pTCB_t TestTask2Handler;
 
 /**
  * @brief  开始任务函数
@@ -361,8 +380,8 @@ pTCB_t TestTask2Handler;
  */
 static void StartTaskFunction(void *paramter)
 {
-	sOSTaskCreate(&TestTask1Handler, &TestTask1);
-	sOSTaskCreate(&TestTask2Handler, &TestTask2);
+	// sOSTaskCreate(&TestTask1Handler, &TestTask1);
+	// sOSTaskCreate(&TestTask2Handler, &TestTask2);
 
 	sOSTaskDelete(NULL);
 	while (1)
