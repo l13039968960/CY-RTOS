@@ -21,11 +21,12 @@ struct TaskControBlocklHandler
 
 	uint8_t Task_Priority;
 
-	uint32_t Task_SizeOfStack; //字
+	uint32_t Task_SizeOfStack; // 字
 
 	TaskFunction Task_Fuction;
 
 	ListItem_t TaskListItem;
+	ListItem_t TaskEventItem;
 };
 
 typedef struct TaskControBlocklHandler TCB_t;

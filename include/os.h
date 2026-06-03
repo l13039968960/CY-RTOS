@@ -14,21 +14,31 @@
 #include "project_def.h"
 #include "task.h"
 #include "heap.h"
+#include "queue.h"
 
-//#define DISABLE_INTERRUPT() RASIE_Basepri()
-//#define ENABLE_INTERRUPT() Clear_Basepri()
+// #define DISABLE_INTERRUPT() RASIE_Basepri()
+// #define ENABLE_INTERRUPT() Clear_Basepri()
 
 struct OSTaskDefType
 {
-	uint8_t Task_Priority;
+	uint32_t Task_Priority;
 
 	uint32_t Task_SizeOfStack; // 字
 
 	TaskFunction Task_Fuction;
 };
-
 typedef struct OSTaskDefType OSTaskDefType_t;
 typedef OSTaskDefType_t *pOSTaskDefType_t;
+
+struct OSQueueDefType
+{
+	BaseType_t Queue_DataNum;
+
+	BaseType_t Queue_DataSize;
+};
+
+typedef struct OSQueueDefType OSQueueDefType_t;
+typedef OSQueueDefType_t *pOSQueueDefType_t;
 
 /**
  * @brief  开启任务调度器函数
@@ -75,19 +85,40 @@ void vOSDelay(BaseType_t DelayTick);
 
 /**
  * @brief  任务创建函数
- * @param TaskHandler:任务句柄指针
- * @param TaskDefStructure:任务结构体
+ * @param TaskHandler:任务句柄
+ * @param TaskDefStructure:任务初始化结构体
+ * @retval pdTRUE:创建成功
+ *		   pdFALSE:创建失败
  * @note
  */
 BaseState_t sOSTaskCreate(pTCB_t *TaskHandler, pOSTaskDefType_t TaskDefStructure);
 
 /**
- * @brief  任务创建函数
- * @param TaskHandler:任务句柄指针
- * @param TaskDefStructure:任务结构体
+ * @brief  任务删除函数
+ * @param TaskHandler:任务句柄
+ * @retval pdTRUE:删除成功
+ *		   pdFALSE:删除失败
  * @note
  */
 BaseState_t sOSTaskDelete(pTCB_t TaskHandler);
 
+/**
+ * @brief  队列创建函数
+ * @param QueueHandler:队列句柄
+ * @param QueueDefStructre:队列初始化结构体
+ * @retval pdTRUE:创建成功
+ *		   pdFALSE:创建失败
+ * @note
+ */
+BaseState_t sOSQueueCreate(pQueue_t *QueueHandler, pOSQueueDefType_t QueueDefStructre);
+
+/**
+ * @brief  队列删除函数
+ * @param QueueHandler:队列句柄
+ * @retval pdTRUE:删除成功
+ *		   pdFALSE:删除失败
+ * @note
+ */
+BaseState_t sOSQueueDelete(pQueue_t *QueueHandler);
 
 #endif

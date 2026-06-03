@@ -17,6 +17,7 @@ typedef uint8_t OSSchedulerState_t;
 
 pTCB_t OSCurrentTCB;						/*当前任务TCB*/
 static OSSchedulerState_t OSSchedulerState; /*任务调度器状态*/
+static pTCB_t OSNextTCB;
 
 static BaseType_t CurrentHihgestTaskPriority;
 static BaseType_t OSCurrentTick;	   /*当前定时器计数器*/
@@ -210,6 +211,210 @@ BaseState_t sOSTaskDelete(pTCB_t TaskHandler)
 	return pdTRUE;
 }
 
+BaseState_t sOSQueueCreate(pQueue_t *QueueHandler, pOSQueueDefType_t QueueDefStructre)
+{
+	BaseState_t xstate;
+	vOSEnterCritical();
+
+	xstate = sQueueCreate(QueueHandler, QueueDefStructre->Queue_DataNum, QueueDefStructre->Queue_DataSize);
+	if (xstate != pdTRUE)
+		return pdFALSE;
+
+	vOSExitCritical();
+
+	return pdTRUE;
+}
+
+BaseState_t sOSQueueDelete(pQueue_t *QueueHandler)
+{
+	BaseState_t xstate;
+
+	vOSEnterCritical();
+
+	xstate = sQueueDelete(*QueueHandler);
+	if (xstate != pdTRUE)
+		return pdFALSE;
+	*QueueHandler = NULL;
+
+	vOSExitCritical();
+
+	return pdTRUE;
+}
+
+BaseState_t sOSQueueSend(pQueue_t QueueHandler, void *Data, BaseType_t WaitTick)
+{
+	__is_null__(QueueHandler);
+	__is_null__(Data);
+
+	BaseState_t xstate;
+	pTCB_t UnBlockTCB;
+	BaseType_t TempTick = OSCurrentTick;
+
+	vOSEnterCritical();
+	if (QueueHandler->Queue_WaitingMessage < QueueHandler->Queue_ItemNum)
+	{
+		sQueueGive(QueueHandler, Data);
+		if (QueueHandler->Queue_RxEventList.NumberOfList != 0)
+		{
+			/*唤醒队列阻塞列表中最高优先级任务*/
+			UnBlockTCB = (pTCB_t)(QueueHandler->Queue_RxEventList.ListEndItem.NextListItem->Owner);
+
+			/*移除阻塞事件列表*/
+			sListItemRemove(&(UnBlockTCB->TaskEventItem), &(QueueHandler->Queue_RxEventList));
+			/*移除阻塞延时列表*/
+			sListItemRemove(&(UnBlockTCB->TaskListItem), &(DelayTaskList));
+			/*加入就绪列表*/
+			sListItemInsert(&(UnBlockTCB->TaskListItem), &(ReadyTaskList), UnBlockTCB->Task_Priority);
+
+			if (UnBlockTCB->Task_Priority > OSCurrentTCB->Task_Priority)
+			{
+				/*任务切换*/
+				OSNextTCB = UnBlockTCB;
+				vOSPendSVpending();
+			}
+		}
+		vOSExitCritical();
+		return pdTRUE;
+	}
+	else
+	{
+		vOSExitCritical();
+		if (WaitTick == 0)
+			return pdFALSE;
+		else
+		{
+			while (1)
+			{
+				/*阻塞时间已到*/
+				if (OSCurrentTick >= TempTick + WaitTick)
+					return pdFALSE;
+				else
+				{
+					/*可以写数据*/
+					if (QueueHandler->Queue_WaitingMessage < QueueHandler->Queue_ItemNum)
+					{
+						vOSEnterCritical();
+						sQueueGive(QueueHandler, Data);
+						if (QueueHandler->Queue_RxEventList.NumberOfList != 0)
+						{
+							/*唤醒队列阻塞列表中最高优先级任务*/
+							UnBlockTCB = (pTCB_t)(QueueHandler->Queue_RxEventList.ListEndItem.NextListItem->Owner);
+
+							/*移除阻塞事件列表*/
+							sListItemRemove(&(UnBlockTCB->TaskEventItem), &(QueueHandler->Queue_RxEventList));
+							/*移除阻塞延时列表*/
+							sListItemRemove(&(UnBlockTCB->TaskListItem), &(DelayTaskList));
+							/*加入就绪列表*/
+							sListItemInsert(&(UnBlockTCB->TaskListItem), &(ReadyTaskList), UnBlockTCB->Task_Priority);
+
+							if (UnBlockTCB->Task_Priority > OSCurrentTCB->Task_Priority)
+							{
+								/*任务切换*/
+								OSNextTCB = UnBlockTCB;
+								vOSPendSVpending();
+							}
+						}
+						vOSExitCritical();
+						return pdTRUE;
+					}
+					else
+					{
+						// /*继续阻塞等待*/
+						vOSDelay(WaitTick - (OSCurrentTick - TempTick));
+					}
+				}
+			}
+		}
+	}
+}
+
+BaseState_t sOSQueueReceive(pQueue_t QueueHandler, void *Data, BaseType_t WaitTick)
+{
+	__is_null__(QueueHandler);
+	__is_null__(Data);
+
+	BaseState_t xstate;
+	pTCB_t UnBlockTCB;
+	BaseType_t TempTick = OSCurrentTick;
+
+	vOSEnterCritical();
+	if (QueueHandler->Queue_WaitingMessage > 0)
+	{
+		xstate = sQueueTake(QueueHandler, Data);
+		if (QueueHandler->Queue_TxEventList.NumberOfList != 0)
+		{
+			/*唤醒队列发送阻塞列表中最高优先级任务*/
+			UnBlockTCB = (pTCB_t)(QueueHandler->Queue_TxEventList.ListEndItem.NextListItem->Owner);
+
+			/*移除阻塞事件列表*/
+			sListItemRemove(&(UnBlockTCB->TaskEventItem), &(QueueHandler->Queue_TxEventList));
+			/*移除阻塞延时列表*/
+			sListItemRemove(&(UnBlockTCB->TaskListItem), &(DelayTaskList));
+			/*加入就绪列表*/
+			sListItemInsert(&(UnBlockTCB->TaskListItem), &(ReadyTaskList), UnBlockTCB->Task_Priority);
+
+			if (UnBlockTCB->Task_Priority > OSCurrentTCB->Task_Priority)
+			{
+				/*任务切换*/
+				OSNextTCB = UnBlockTCB;
+				vOSPendSVpending();
+			}
+		}
+		vOSExitCritical();
+		return pdTRUE;
+	}
+	else
+	{
+		vOSExitCritical();
+		if (WaitTick == 0)
+			return pdFALSE;
+		else
+		{
+			while (1)
+			{
+				/*阻塞时间已到*/
+				if (OSCurrentTick >= TempTick + WaitTick)
+					return pdFALSE;
+				else
+				{
+					/*可以收数据*/
+					if (QueueHandler->Queue_WaitingMessage > 0)
+					{
+						vOSEnterCritical();
+						sQueueTake(QueueHandler, Data);
+						if (QueueHandler->Queue_TxEventList.NumberOfList != 0)
+						{
+							/*唤醒队列阻塞列表中最高优先级任务*/
+							UnBlockTCB = (pTCB_t)(QueueHandler->Queue_TxEventList.ListEndItem.NextListItem->Owner);
+
+							/*移除阻塞事件列表*/
+							sListItemRemove(&(UnBlockTCB->TaskEventItem), &(QueueHandler->Queue_TxEventList));
+							/*移除阻塞延时列表*/
+							sListItemRemove(&(UnBlockTCB->TaskListItem), &(DelayTaskList));
+							/*加入就绪列表*/
+							sListItemInsert(&(UnBlockTCB->TaskListItem), &(ReadyTaskList), UnBlockTCB->Task_Priority);
+
+							if (UnBlockTCB->Task_Priority > OSCurrentTCB->Task_Priority)
+							{
+								/*任务切换*/
+								OSNextTCB = UnBlockTCB;
+								vOSPendSVpending();
+							}
+						}
+						vOSExitCritical();
+						return pdTRUE;
+					}
+					else
+					{
+						// /*继续阻塞等待*/
+						vOSDelay(WaitTick - (OSCurrentTick - TempTick));
+					}
+				}
+			}
+		}
+	}
+}
+
 /**
  * @brief  开启第一个任务
  * @note
@@ -331,9 +536,17 @@ void TaskExitError(void)
 void vOSSwitchTCB(void)
 {
 	pListItem_t ListItem;
-	sListGetIndexItem(&ReadyTaskList[CurrentHihgestTaskPriority], &ListItem);
-	if (ListItem != NULL)
-		OSCurrentTCB = (pTCB_t)ListItem->Owner;
+	if (OSNextTCB != NULL)
+	{
+		OSCurrentTCB = OSNextTCB;
+		OSNextTCB = NULL;
+	}
+	else
+	{
+		sListGetIndexItem(&ReadyTaskList[CurrentHihgestTaskPriority], &ListItem);
+		if (ListItem != NULL)
+			OSCurrentTCB = (pTCB_t)ListItem->Owner;
+	}
 }
 
 /**
