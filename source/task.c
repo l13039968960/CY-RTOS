@@ -52,13 +52,20 @@ BaseState_t sTaskCreate(pTCB_t *TCB, TaskFunction Task_Fuction, uint8_t Task_Pri
 			/*任务堆栈初始化*/
 			(*TCB)->Task_Stack = Stack;
 			vTaskStackInit(*TCB);
-			
+
 			/*任务列表项初始化*/
 			(*TCB)->TaskListItem.Container = NULL;
 			(*TCB)->TaskListItem.ItemValue = 0;
 			(*TCB)->TaskListItem.NextListItem = NULL;
 			(*TCB)->TaskListItem.PreListItem = NULL;
 			(*TCB)->TaskListItem.Owner = (void *)(*TCB);
+
+			/*事件列表项初始化*/
+			(*TCB)->TaskEventItem.Container = NULL;
+			(*TCB)->TaskEventItem.ItemValue = 0;
+			(*TCB)->TaskEventItem.NextListItem = NULL;
+			(*TCB)->TaskEventItem.PreListItem = NULL;
+			(*TCB)->TaskEventItem.Owner = (void *)(*TCB);
 		}
 		else
 		{
@@ -121,8 +128,8 @@ static BaseType_t vTaskStackInit(pTCB_t TCB)
 	*TopOfStack = (StackType_t)TCB->Task_Fuction; // PC
 	TopOfStack--;
 	*TopOfStack = (StackType_t)TaskExitError; // LR
-	TopOfStack -= 5;					   // R12,R3,R2,R1,R0
-	TopOfStack -= 8;					   // R11,R10,R9,R8,R7,R6,R5,R4
+	TopOfStack -= 5;						  // R12,R3,R2,R1,R0
+	TopOfStack -= 8;						  // R11,R10,R9,R8,R7,R6,R5,R4
 
 	/*更新栈顶指针*/
 	TCB->Task_TopOfStack = TopOfStack;

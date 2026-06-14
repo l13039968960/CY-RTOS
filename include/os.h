@@ -30,15 +30,15 @@ struct OSTaskDefType
 typedef struct OSTaskDefType OSTaskDefType_t;
 typedef OSTaskDefType_t *pOSTaskDefType_t;
 
-struct OSQueueDefType
-{
-	BaseType_t Queue_DataNum;
+// struct OSQueueDefType
+// {
+// 	BaseType_t Queue_DataNum;
 
-	BaseType_t Queue_DataSize;
-};
+// 	BaseType_t Queue_DataSize;
+// };
 
-typedef struct OSQueueDefType OSQueueDefType_t;
-typedef OSQueueDefType_t *pOSQueueDefType_t;
+// typedef struct OSQueueDefType OSQueueDefType_t;
+// typedef OSQueueDefType_t *pOSQueueDefType_t;
 
 /**
  * @brief  开启任务调度器函数
@@ -102,23 +102,5 @@ BaseState_t sOSTaskCreate(pTCB_t *TaskHandler, pOSTaskDefType_t TaskDefStructure
  */
 BaseState_t sOSTaskDelete(pTCB_t TaskHandler);
 
-/**
- * @brief  队列创建函数
- * @param QueueHandler:队列句柄
- * @param QueueDefStructre:队列初始化结构体
- * @retval pdTRUE:创建成功
- *		   pdFALSE:创建失败
- * @note
- */
-BaseState_t sOSQueueCreate(pQueue_t *QueueHandler, pOSQueueDefType_t QueueDefStructre);
-
-/**
- * @brief  队列删除函数
- * @param QueueHandler:队列句柄
- * @retval pdTRUE:删除成功
- *		   pdFALSE:删除失败
- * @note
- */
-BaseState_t sOSQueueDelete(pQueue_t *QueueHandler);
 
 #endif

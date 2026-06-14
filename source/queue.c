@@ -1,83 +1,137 @@
-#include "../include/queue.h"
+#include "../include/queue_ex.h"
+#include "../include/queue_prv.h"
 #include <string.h>
 
-BaseState_t sQueueCreate(pQueue_t *QueueHandler, BaseType_t QueueItemNum, BaseType_t QueueItemSize)
+static Queue_ops_t Queue_ops = {
+	.vQueueDeInit = vQueueDestory,
+	.sQueueGive = sQueueGive,
+	.sQueueTake = sQueueTake,
+	.sQueueGetRxList = sQueueGetRxList,
+	.sQueueGetTxList = sQueueGetTxList};
+
+pQueue_t xQueueCreate(BaseType_t MessageNum, BaseType_t MessageSize)
 {
-	BaseState_t xstate;
-	xstate = sHeapMemAllocate(sizeof(Queue_t), (pStackType_t *)QueueHandler);
-	if (xstate == pdTRUE)
+	BaseState_t state;
+	pQueue_t this;
+
+	/*分配句柄空间*/
+	state = sHeapMemAllocate(sizeof(Queue_t), (pStackType_t *)&this);
+	if (state != pdTRUE)
+		this = NULL;
+	else
 	{
-		xstate = sHeapMemAllocate(QueueItemNum * QueueItemSize, (pStackType_t *)&((*QueueHandler)->Queue_Storage));
-		if (xstate == pdTRUE)
+		/*分配缓冲区空间*/
+		state = sHeapMemAllocate(MessageNum * MessageSize, (pStackType_t *)&this->Storage);
+		if (state != pdTRUE)
 		{
-			(*QueueHandler)->Queue_StorageTail = (pQueueType_t)((uint32_t)(*QueueHandler)->Queue_Storage + (uint32_t)((*QueueHandler)->Queue_ItemNum * (*QueueHandler)->Queue_ItemSize));
-
-			(*QueueHandler)->Queue_ItemNum = QueueItemNum;
-			(*QueueHandler)->Queue_ItemSize = QueueItemSize;
-
-			(*QueueHandler)->Queue_pWrite = (*QueueHandler)->Queue_Storage;
-			(*QueueHandler)->Queue_pRead = (*QueueHandler)->Queue_Storage;
-
-			(*QueueHandler)->Queue_WaitingMessage = 0;
-
-			sListCreatStatic(&((*QueueHandler)->Queue_RxEventList));
-			sListCreatStatic(&((*QueueHandler)->Queue_TxEventList));
+			/*失败则释放句柄空间*/
+			sHeapMemFree((pStackType_t)this);
+			this = NULL;
 		}
 		else
 		{
-			sHeapMemFree((StackType_t *)(*QueueHandler));
-			return pdFALSE;
+			/*QueueBase初始化*/
+			this->Queue_Count = 0;
+
+			this->vptr = &Queue_ops;
+
+			sListCreatStatic(&this->Queue_RxEventList);
+			sListCreatStatic(&this->Queue_TxEventList);
+
+			/*MessageQueue初始化*/
+			this->MessageNum = MessageNum;
+			this->MessageSize = MessageSize;
+
+			this->StorageTail = (pQueueType_t)((uint32_t)this->StorageTail + MessageNum * MessageSize);
+
+			this->pRead = this->Storage;
+			this->pWrite = this->Storage;
+
+			this->type = MessageQueue;
 		}
 	}
+    
+    return this;
+}
+
+static void vQueueDestory(pQueue_t this)
+{
+	sHeapMemFree((pStackType_t)this->Storage);
+	sHeapMemFree((pStackType_t)this);
+}
+
+static QueueState_t sQueueTake(pQueue_t this, void *Data)
+{
+	QueueState_t state;
+	if (this->Queue_Count <= 0)
+		state = Storge_Empty;
 	else
 	{
-		return pdFALSE;
+		/*值复制*/
+		memcpy(Data, (void *)this->pRead, (size_t)this->MessageSize);
+
+		this->Queue_Count--;
+		this->pRead += this->MessageSize;
+
+		if (this->pRead >= this->StorageTail)
+			this->pRead = this->Storage;
+
+		state = TRUE;
 	}
-	return pdTRUE;
+	return state;
 }
 
-BaseState_t sQueueDelete(pQueue_t QueueHandler)
+static QueueState_t sQueueGive(pQueue_t this, void *Data)
 {
-	BaseState_t xstate;
-	xstate = sHeapMemFree((StackType_t *)(QueueHandler->Queue_Storage));
-	if (xstate != pdTRUE)
-		return pdFALSE;
-	xstate = sHeapMemFree((StackType_t *)QueueHandler);
-	if (xstate != pdTRUE)
-		return pdFALSE;
+	QueueState_t state;
+	if (this->Queue_Count >= this->MessageNum)
+		state = Storge_Full;
+	else
+	{
+		/*值复制*/
+		memcpy((void *)this->pWrite, Data, (size_t)this->MessageSize);
 
-	return pdTRUE;
+		this->Queue_Count++;
+		this->pWrite += this->MessageSize;
+
+		if (this->pWrite >= this->StorageTail)
+			this->pWrite = this->Storage;
+
+		state = TRUE;
+	}
+	return state;
 }
 
-BaseState_t sQueueTake(pQueue_t QueueHandler, void *Data)
+static QueueState_t sQueueGetRxList(pQueue_t this, pList_t *pList)
 {
-	if (QueueHandler->Queue_WaitingMessage <= 0)
-		return pdFALSE;
+	QueueState_t state;
 
-	memcpy(Data, (void *)QueueHandler->Queue_pRead, (size_t)QueueHandler->Queue_ItemSize);
+	*pList = &this->Queue_RxEventList;
+	state = TRUE;
 
-	QueueHandler->Queue_WaitingMessage--;
-
-	QueueHandler->Queue_pRead += QueueHandler->Queue_ItemSize;
-
-	if (QueueHandler->Queue_pRead >= QueueHandler->Queue_StorageTail)
-		QueueHandler->Queue_pRead == QueueHandler->Queue_Storage;
-
-	return pdTRUE;
+	return state;
 }
 
-BaseState_t sQueueGive(pQueue_t QueueHandler, void *Data)
+static QueueState_t sQueueGetTxList(pQueue_t this, pList_t *pList)
 {
-	if (QueueHandler->Queue_WaitingMessage >= QueueHandler->Queue_ItemNum)
-		return pdFALSE;
+	QueueState_t state;
 
-	memcpy((void *)QueueHandler->Queue_pWrite, Data, (size_t)QueueHandler->Queue_ItemSize);
-	QueueHandler->Queue_WaitingMessage++;
+	*pList = &this->Queue_TxEventList;
+	state = TRUE;
 
-	QueueHandler->Queue_pWrite += QueueHandler->Queue_ItemSize;
-
-	if (QueueHandler->Queue_pWrite >= QueueHandler->Queue_StorageTail)
-		QueueHandler->Queue_pWrite == QueueHandler->Queue_Storage;
-
-	return pdTRUE;
+	return state;
 }
+
+// static QueueState_t sQueueGetRxListItem(pQueue_t this, pListItem_t *pListItem)
+// {
+// 	QueueState_t state;
+// 	if (this->Queue_RxEventList.NumberOfList == 0)
+// 		state = List_Null;
+// 	else
+// 	{
+// 		*pListItem = this->Queue_RxEventList.ListEndItem.PreListItem;
+
+// 		state = pdTRUE;
+// 	}
+// 	return state;
+// }
