@@ -15,7 +15,7 @@
 /*内存控制块结构体所占用的字节数(8的倍数)*/
 static const uint8_t MCB_SturctSize = (sizeof(MCB_t) + MEM_ALIGN_MASK) & ~MEM_ALIGN_MASK;
 /*静态栈空间*/
-static uint8_t HeapMemstack[Memstack_size * sizeof(StackType_t)] __attribute__((aligned(8)));
+uint8_t HeapMemstack[Memstack_size * sizeof(StackType_t)] __attribute__((aligned(8)));
 /*空闲内存块列表*/
 static List_t FreeMemoryBlockList;
 

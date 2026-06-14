@@ -2,6 +2,8 @@
 #define __OS_CONFIG_H__
 
 #define Memstack_size 1024 * 10
+#define Def_Tick 10
+
 
 #define vPortSysTickHandler SysTick_Handler
 #define vPortPendSVHandler PendSV_Handler

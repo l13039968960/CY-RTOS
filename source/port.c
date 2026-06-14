@@ -13,14 +13,14 @@
  * @brief  底层配置开启任务调度器
  * @note  
  */
-void vPortSchedluerStart(void)
+void vPortPendSVSysTickConfig(void)
 {
     /*设置PendSV和Systick中断优先级*/
     NVIC_PENDSV_SYSTICK_PRIORITY_REG |= (uint32_t)(__OS_Min_SYSInterrupt_Priority << 16) | (uint32_t)(__OS_Min_SYSInterrupt_Priority << 24);
 
     /*配置Systick*/
     NVIC_SYSTICK_CTRL_REG = 0;          // CTRL
-    NVIC_SYSTICK_LOAD_REG = 8000 - 1;   // LOAD
+    NVIC_SYSTICK_LOAD_REG = 9000 - 1;   // LOAD 72Mhz
     NVIC_SYSTICK_CURRENT_VALUE_REG = 0; // VAL
 
     NVIC_SYSTICK_CTRL_REG = (0x0 << 2) | (0x1 << 1) | (0x1 << 0); // CTRL
@@ -79,6 +79,8 @@ __asm void vPortStartFirstTask(void)
 
 	msr msp, r0 /*重新加载msp*/
 
+	mov r0, #0 /*开中断*/
+	msr basepri, r0
 	cpsie i /*开中断*/
 	cpsie f
 	dsb
@@ -102,7 +104,7 @@ __asm void vPortPendSVHandler(void)
 	isb
 	stmdb r0 !, {r4 - r11} /*旧任务r4-r11入栈*/
 
-	ldr r1, =OSCurrentTCB /*将入栈后的栈顶保存到旧任务中*/
+	ldr r1, =OSCurrentTCB /*保存psp*/
 	ldr r2, [r1] 
 	str r0, [r2]
 
@@ -125,7 +127,6 @@ __asm void vPortPendSVHandler(void)
 	msr psp, r0 /*保存新任务栈顶到进程堆栈*/
 	isb
 	bx r14 
-    nop
 }
 
 /**
@@ -147,9 +148,6 @@ __asm void vPortSVCHandler(void)
 	msr psp, r2 /*psp重新赋值*/
 	isb
 
-	mov r0, #0 /*开中断*/
-	msr basepri, r0
-
-	orr r14, #0xd /*设置异常返回值，返回到任务堆栈，线程模式*/
+	orr r14, #0xd /*设置异常返回值，返回到线程模式,使用任务堆栈*/
 	bx r14
 }

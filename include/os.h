@@ -40,6 +40,8 @@ typedef OSTaskDefType_t *pOSTaskDefType_t;
 // typedef struct OSQueueDefType OSQueueDefType_t;
 // typedef OSQueueDefType_t *pOSQueueDefType_t;
 
+void vOSInit(void);
+
 /**
  * @brief  开启任务调度器函数
  * @note
@@ -101,6 +103,5 @@ BaseState_t sOSTaskCreate(pTCB_t *TaskHandler, pOSTaskDefType_t TaskDefStructure
  * @note
  */
 BaseState_t sOSTaskDelete(pTCB_t TaskHandler);
-
 
 #endif
