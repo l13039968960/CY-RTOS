@@ -11,10 +11,10 @@
 #define __OS_H__
 
 #include "os_config.h"
-#include "project_def.h"
-#include "task.h"
-#include "heap.h"
-#include "queue.h"
+#include "../source/include/project_def.h"
+#include "../source/include/task.h"
+#include "../source/include/heap.h"
+#include "../source/include/queue.h"
 
 // #define DISABLE_INTERRUPT() RASIE_Basepri()
 // #define ENABLE_INTERRUPT() Clear_Basepri()

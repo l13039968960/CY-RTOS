@@ -7,7 +7,7 @@
  * @copyright:
  * @note     :
  *************************************************************************/
-#include "../include/heap.h"
+#include "../../include/heap.h"
 
 #define MEM_ALIGN_SIZE 0x0008
 #define MEM_ALIGN_MASK 0x0007

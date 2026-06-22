@@ -11,7 +11,7 @@
 #ifndef __HEAP_H__
 #define __HEAP_H__
 
-#include "os_config.h"
+#include "../../include/os_config.h"
 #include "project_def.h"
 #include "list.h"
 

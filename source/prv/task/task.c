@@ -8,12 +8,12 @@
  * @note     :
  *************************************************************************/
 
-#include "../include/task.h"
-#include "../include/heap.h"
-#include "../include/list.h"
-#include "../include/os.h"
-#include "../include/os_config.h"
-#include "../include/project_def.h"
+#include "../../include/task.h"
+#include "../../include/heap.h"
+#include "../../include/list.h"
+#include "../../../include/os.h"
+#include "../../../include/os_config.h"
+#include "../../include/project_def.h"
 
 #include "string.h"
 #include "stdio.h"
@@ -21,8 +21,9 @@
 
 #define MEM_ALIGN_SIZE 0x0008
 #define MEM_ALIGN_MASK 0x0007
+#define STACK_MAGIC_WORD 0xDEADBEEF /*栈底魔术字*/
 
-static BaseType_t vTaskStackInit(pTCB_t TCB);
+static pStackType_t vTaskStackInit(pTCB_t TCB);
 
 BaseState_t sTaskCreate(pTCB_t *TCB, TaskFunction Task_Fuction, uint8_t Task_Priority, uint32_t Task_SizeOfStack)
 {
@@ -46,19 +47,21 @@ BaseState_t sTaskCreate(pTCB_t *TCB, TaskFunction Task_Fuction, uint8_t Task_Pri
 
 			/*任务控制块初始化*/
 			(*TCB)->Task_Priority = Task_Priority;
+			(*TCB)->Task_BasePriority = Task_Priority;
 			(*TCB)->Task_SizeOfStack = Task_SizeOfStack;
 			(*TCB)->Task_Fuction = Task_Fuction;
+			(*TCB)->Task_MutexCount = 0;
 
 			/*任务堆栈初始化*/
 			(*TCB)->Task_Stack = Stack;
-			vTaskStackInit(*TCB);
+			(*TCB)->Task_TopOfStack = vTaskStackInit(*TCB);
 
 			/*任务列表项初始化*/
-			(*TCB)->TaskListItem.Container = NULL;
-			(*TCB)->TaskListItem.ItemValue = 0;
-			(*TCB)->TaskListItem.NextListItem = NULL;
-			(*TCB)->TaskListItem.PreListItem = NULL;
-			(*TCB)->TaskListItem.Owner = (void *)(*TCB);
+			(*TCB)->TaskStateItem.Container = NULL;
+			(*TCB)->TaskStateItem.ItemValue = 0;
+			(*TCB)->TaskStateItem.NextListItem = NULL;
+			(*TCB)->TaskStateItem.PreListItem = NULL;
+			(*TCB)->TaskStateItem.Owner = (void *)(*TCB);
 
 			/*事件列表项初始化*/
 			(*TCB)->TaskEventItem.Container = NULL;
@@ -106,7 +109,7 @@ BaseState_t sTaskDelete(pTCB_t TCB)
  *          pdFALSE: 创建失败
  * @note
  */
-static BaseType_t vTaskStackInit(pTCB_t TCB)
+static pStackType_t vTaskStackInit(pTCB_t TCB)
 {
 	__is_null__(TCB);
 
@@ -132,7 +135,5 @@ static BaseType_t vTaskStackInit(pTCB_t TCB)
 	TopOfStack -= 8;						  // R11,R10,R9,R8,R7,R6,R5,R4
 
 	/*更新栈顶指针*/
-	TCB->Task_TopOfStack = TopOfStack;
-
-	return pdTRUE;
+	return TopOfStack;
 }

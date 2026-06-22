@@ -1,21 +1,16 @@
-#include "../include/os_queue.h"
-#include "../include/queue_ex.h"
+#include "../../include/os_queue.h"
+#include "./include/os_prv.h"
+#include "../include/queue.h"
 
-extern pTCB_t OSCurrentTCB;		 /*当前任务TCB*/
-extern List_t ReadyTaskList[32]; /*就绪任务列表*/
-extern List_t DelayTaskList;	 /*延时阻塞任务列表*/
-extern BaseType_t OSCurrentTick; /*当前定时器计数器*/
-extern pTCB_t OSNextTCB;
-
-pQueue_t sOSQueueCreate(BaseType_t MessageNum, BaseType_t MessageSize, Type_t type)
+void *sOSQueueCreate(BaseType_t MessageNum, BaseType_t MessageSize, Type_t type)
 {
-	pQueue_t QueueHandler;
+	void *QueueHandler;
 	vOSEnterCritical();
 
 	switch (type)
 	{
 	case MessageQueue:
-		QueueHandler = xQueueCreate(MessageNum, MessageSize);
+		QueueHandler = (void *)xMessageQueueCreate(MessageNum, MessageSize);
 		break;
 	}
 
@@ -37,19 +32,19 @@ void vOSQueueDestory(pQueue_t *QueueHandler)
 
 OSQueueState_t sOSQueueSend(pQueue_t QueueHandler, void *Data, BaseType_t WaitTick)
 {
-	OSQueueState_t sreturn = Fail;
+	OSQueueState_t sreturn;
 
 	if (QueueHandler == NULL || Data == NULL)
-		sreturn = ErrorPar;
+		sreturn = OSQueueErrorPar;
 
 	pTCB_t UnBlockTCB;
 	BaseType_t LastTick = OSCurrentTick, HasWaitTick = 0;
 	pList_t pList;
 
 	vOSEnterCritical();
-	if (sQueueGive(QueueHandler, Data) == TRUE)
+	if (sQueueGive(QueueHandler, Data) == QueueTrue)
 	{
-		if (sQueueGetRxList(QueueHandler, &pList) == TRUE)
+		if (sQueueGetRxList(QueueHandler, &pList) == QueueTrue)
 		{
 			if (pList->NumberOfList != 0)
 			{
@@ -59,9 +54,9 @@ OSQueueState_t sOSQueueSend(pQueue_t QueueHandler, void *Data, BaseType_t WaitTi
 				/*移除阻塞事件列表*/
 				sListItemRemove(&UnBlockTCB->TaskEventItem, pList);
 				/*移除阻塞延时列表*/
-				sListItemRemove(&UnBlockTCB->TaskListItem, &DelayTaskList);
+				sListItemRemove(&UnBlockTCB->TaskStateItem, &DelayTaskList);
 				/*加入就绪列表*/
-				sListItemInsert(&UnBlockTCB->TaskListItem, &ReadyTaskList[UnBlockTCB->Task_Priority], UnBlockTCB->Task_Priority);
+				sListItemInsert(&UnBlockTCB->TaskStateItem, &ReadyTaskList[UnBlockTCB->Task_Priority], UnBlockTCB->Task_Priority);
 
 				if (UnBlockTCB->Task_Priority > OSCurrentTCB->Task_Priority)
 				{
@@ -72,19 +67,19 @@ OSQueueState_t sOSQueueSend(pQueue_t QueueHandler, void *Data, BaseType_t WaitTi
 			}
 		}
 		vOSExitCritical();
-		sreturn = Pass;
+		sreturn = OSQueuePass;
 	}
 	else
 	{
 		if (WaitTick == 0)
 		{
 			vOSExitCritical();
-			sreturn = Pass;
+			sreturn = OSQueuePass;
 		}
 		else
 		{
 			/*阻塞*/
-			if (sQueueGetTxList(QueueHandler, &pList) == TRUE)
+			if (sQueueGetTxList(QueueHandler, &pList) == QueueTrue)
 			{
 				/*加入发送阻塞列表*/
 				sListItemInsert(&OSCurrentTCB->TaskEventItem, pList, OSCurrentTCB->Task_Priority);
@@ -93,18 +88,18 @@ OSQueueState_t sOSQueueSend(pQueue_t QueueHandler, void *Data, BaseType_t WaitTi
 				{
 					if (HasWaitTick >= WaitTick)
 					{
-						sreturn = Fail;
+						sreturn = OSQueueFail;
 						break;
 					}
 					else
 					{
 						vOSEnterCritical();
 						/*可以写数据*/
-						if (sQueueGive(QueueHandler, Data) == TRUE)
+						if (sQueueGive(QueueHandler, Data) == QueueTrue)
 						{
 							sListItemRemove(&OSCurrentTCB->TaskEventItem, pList);
 							/*是否还有等待接收任务*/
-							if (sQueueGetRxList(QueueHandler, &pList) == TRUE)
+							if (sQueueGetRxList(QueueHandler, &pList) == QueueTrue)
 							{
 								if (pList->NumberOfList != 0)
 								{
@@ -113,9 +108,9 @@ OSQueueState_t sOSQueueSend(pQueue_t QueueHandler, void *Data, BaseType_t WaitTi
 									/*移除阻塞事件列表*/
 									sListItemRemove(&UnBlockTCB->TaskEventItem, pList);
 									/*移除阻塞延时列表*/
-									sListItemRemove(&UnBlockTCB->TaskListItem, &DelayTaskList);
+									sListItemRemove(&UnBlockTCB->TaskStateItem, &DelayTaskList);
 									/*加入就绪列表*/
-									sListItemInsert(&UnBlockTCB->TaskListItem, &ReadyTaskList[UnBlockTCB->Task_Priority], UnBlockTCB->Task_Priority);
+									sListItemInsert(&UnBlockTCB->TaskStateItem, &ReadyTaskList[UnBlockTCB->Task_Priority], UnBlockTCB->Task_Priority);
 
 									if (UnBlockTCB->Task_Priority > OSCurrentTCB->Task_Priority)
 									{
@@ -126,7 +121,7 @@ OSQueueState_t sOSQueueSend(pQueue_t QueueHandler, void *Data, BaseType_t WaitTi
 								}
 							}
 							vOSExitCritical();
-							sreturn = Pass;
+							sreturn = OSQueuePass;
 							break;
 						}
 						else
@@ -147,19 +142,19 @@ OSQueueState_t sOSQueueSend(pQueue_t QueueHandler, void *Data, BaseType_t WaitTi
 
 OSQueueState_t sOSQueueReceive(pQueue_t QueueHandler, void *Data, BaseType_t WaitTick)
 {
-	OSQueueState_t sreturn = Fail;
+	OSQueueState_t sreturn;
 
 	if (QueueHandler == NULL)
-		sreturn = ErrorPar;
+		sreturn = OSQueueErrorPar;
 
 	pTCB_t UnBlockTCB;
 	BaseType_t LastTick = OSCurrentTick, HasWaitTick = 0;
 	pList_t pList;
 
 	vOSEnterCritical();
-	if (sQueueTake(QueueHandler, Data) == TRUE)
+	if (sQueueTake(QueueHandler, Data) == QueueTrue)
 	{
-		if (sQueueGetTxList(QueueHandler, &pList) == TRUE)
+		if (sQueueGetTxList(QueueHandler, &pList) == QueueTrue)
 		{
 			if (pList->NumberOfList != 0)
 			{
@@ -169,9 +164,9 @@ OSQueueState_t sOSQueueReceive(pQueue_t QueueHandler, void *Data, BaseType_t Wai
 				/*移除阻塞事件列表*/
 				sListItemRemove(&UnBlockTCB->TaskEventItem, pList);
 				/*移除阻塞延时列表*/
-				sListItemRemove(&UnBlockTCB->TaskListItem, &DelayTaskList);
+				sListItemRemove(&UnBlockTCB->TaskStateItem, &DelayTaskList);
 				/*加入就绪列表*/
-				sListItemInsert(&UnBlockTCB->TaskListItem, &ReadyTaskList[UnBlockTCB->Task_Priority], UnBlockTCB->Task_Priority);
+				sListItemInsert(&UnBlockTCB->TaskStateItem, &ReadyTaskList[UnBlockTCB->Task_Priority], UnBlockTCB->Task_Priority);
 			}
 
 			if (UnBlockTCB->Task_Priority > OSCurrentTCB->Task_Priority)
@@ -182,18 +177,18 @@ OSQueueState_t sOSQueueReceive(pQueue_t QueueHandler, void *Data, BaseType_t Wai
 			}
 		}
 		vOSExitCritical();
-		sreturn = Pass;
+		sreturn = OSQueuePass;
 	}
 	else
 	{
 		if (WaitTick == 0)
 		{
 			vOSExitCritical();
-			sreturn = Fail;
+			sreturn = OSQueueFail;
 		}
 		else
 		{
-			if (sQueueGetRxList(QueueHandler, &pList) == TRUE)
+			if (sQueueGetRxList(QueueHandler, &pList) == QueueTrue)
 			{
 				/*加入接收阻塞列表*/
 				sListItemInsert(&OSCurrentTCB->TaskEventItem, pList, OSCurrentTCB->Task_Priority);
@@ -203,20 +198,23 @@ OSQueueState_t sOSQueueReceive(pQueue_t QueueHandler, void *Data, BaseType_t Wai
 					/*阻塞时间已到*/
 					if (HasWaitTick >= WaitTick)
 					{
-						sreturn = Fail;
+						vOSEnterCritical();
+						sListItemRemove(&OSCurrentTCB->TaskEventItem, pList);
+
+						sreturn = OSQueueFail;
 						break;
 					}
 					else
 					{
 						vOSEnterCritical();
 						/*可以收数据*/
-						if (sQueueTake(QueueHandler, Data) == TRUE)
+						if (sQueueTake(QueueHandler, Data) == QueueTrue)
 						{
 							/*从接收阻塞列表移除*/
 							sListItemRemove(&OSCurrentTCB->TaskEventItem, pList);
 
 							/*是否还有等待发送任务*/
-							if (sQueueGetTxList(QueueHandler, &pList) == TRUE)
+							if (sQueueGetTxList(QueueHandler, &pList) == QueueTrue)
 							{
 								if (pList->NumberOfList != 0)
 								{
@@ -225,9 +223,9 @@ OSQueueState_t sOSQueueReceive(pQueue_t QueueHandler, void *Data, BaseType_t Wai
 									/*移除阻塞事件列表*/
 									sListItemRemove(&UnBlockTCB->TaskEventItem, pList);
 									/*移除阻塞延时列表*/
-									sListItemRemove(&UnBlockTCB->TaskListItem, &DelayTaskList);
+									sListItemRemove(&UnBlockTCB->TaskStateItem, &DelayTaskList);
 									/*加入就绪列表*/
-									sListItemInsert(&UnBlockTCB->TaskListItem, &ReadyTaskList[UnBlockTCB->Task_Priority], UnBlockTCB->Task_Priority);
+									sListItemInsert(&UnBlockTCB->TaskStateItem, &ReadyTaskList[UnBlockTCB->Task_Priority], UnBlockTCB->Task_Priority);
 
 									if (UnBlockTCB->Task_Priority > OSCurrentTCB->Task_Priority)
 									{
@@ -238,7 +236,7 @@ OSQueueState_t sOSQueueReceive(pQueue_t QueueHandler, void *Data, BaseType_t Wai
 								}
 							}
 							vOSExitCritical();
-							sreturn = Pass;
+							sreturn = OSQueuePass;
 							break;
 						}
 						else

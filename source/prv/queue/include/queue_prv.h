@@ -1,8 +1,13 @@
 #ifndef __QUEUE_PRV_H__
 #define __QUEUE_PRV_H__
 
-#include "heap.h"
-#include "list.h"
+#include "../../../include/list.h"
+#include "../../../include/heap.h"
+#include "../../../include/queue.h"
+#include "../../../include/task.h"
+
+#include "../../../../include/os_config.h"
+#include "../../../include/project_def.h"
 
 typedef struct Queue_ops
 {

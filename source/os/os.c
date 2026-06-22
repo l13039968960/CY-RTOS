@@ -7,7 +7,7 @@
  * @copyright:
  * @note     :
  *************************************************************************/
-#include "../include/os.h"
+#include "../../include/os.h"
 
 #define OSstop 0
 #define OSpending 1
@@ -123,10 +123,10 @@ void vOSDelay(BaseType_t DelayTick)
 		OSNextBlockedTick = BlockTick;
 
 	/*从就绪列表中移除*/
-	sListItemRemove(&(OSCurrentTCB->TaskListItem), &ReadyTaskList[OSCurrentTCB->Task_Priority]);
+	sListItemRemove(&(OSCurrentTCB->TaskStateItem), &ReadyTaskList[OSCurrentTCB->Task_Priority]);
 
 	/*添加到延时阻塞列表*/
-	sListItemInsert(&(OSCurrentTCB->TaskListItem), &DelayTaskList, BlockTick);
+	sListItemInsert(&(OSCurrentTCB->TaskStateItem), &DelayTaskList, BlockTick);
 
 	/*切换当前任务最高优先级*/
 	vOSSwitchHighestPriority();
@@ -149,7 +149,7 @@ BaseState_t sOSTaskCreate(pTCB_t *TaskHandler, pOSTaskDefType_t TaskDefStructure
 		return pdFALSE;
 	}
 
-	xstate = sListItemInsert(&((*TaskHandler)->TaskListItem), &ReadyTaskList[(*TaskHandler)->Task_Priority], (*TaskHandler)->Task_Priority);
+	xstate = sListItemInsert(&((*TaskHandler)->TaskStateItem), &ReadyTaskList[(*TaskHandler)->Task_Priority], (*TaskHandler)->Task_Priority);
 	if (xstate != pdTRUE)
 	{
 		vOSExitCritical();
@@ -181,7 +181,7 @@ BaseState_t sOSTaskDelete(pTCB_t TaskHandler)
 		TaskHandler = OSCurrentTCB;
 
 		/*从列表中移除列表项*/
-		xstate = sListItemRemove(&(TaskHandler->TaskListItem), TaskHandler->TaskListItem.Container);
+		xstate = sListItemRemove(&(TaskHandler->TaskStateItem), TaskHandler->TaskStateItem.Container);
 		if (xstate != pdTRUE)
 		{
 			vOSExitCritical();
@@ -189,7 +189,7 @@ BaseState_t sOSTaskDelete(pTCB_t TaskHandler)
 		}
 
 		/*插入延迟删除列表*/
-		xstate = sListItemInsert(&(TaskHandler->TaskListItem), &OSPendDeleteTaskList, 0);
+		xstate = sListItemInsert(&(TaskHandler->TaskStateItem), &OSPendDeleteTaskList, 0);
 		if (xstate != pdTRUE)
 		{
 			vOSExitCritical();
@@ -204,7 +204,7 @@ BaseState_t sOSTaskDelete(pTCB_t TaskHandler)
 	else
 	{
 		/*从列表中移除列表项*/
-		xstate = sListItemRemove(&(TaskHandler->TaskListItem), TaskHandler->TaskListItem.Container);
+		xstate = sListItemRemove(&(TaskHandler->TaskStateItem), TaskHandler->TaskStateItem.Container);
 		if (xstate != pdTRUE)
 		{
 			vOSExitCritical();
@@ -331,12 +331,42 @@ void TaskExitError(void)
 }
 
 /**
+ * @brief  栈溢出处理函数
+ * @note   当检测到栈溢出时调用
+ */
+void vOSTaskStackOverflow(pTCB_t TCB)
+{
+	vOSEnterCritical();
+	printf("Stack Overflow!\r\n");
+
+	while (1)
+	{
+	}
+}
+
+/**
  * @brief  切换最高优先级任务TCB
  * @note
  */
 void vOSSwitchTCB(void)
 {
 	pListItem_t pListItem;
+	/*栈溢出检测*/
+	if (OSCurrentTCB != NULL)
+	{
+		if (*(OSCurrentTCB->Task_Stack) != 0xa5a5a5a5)
+		{
+			vOSTaskStackOverflow(OSCurrentTCB);
+		}
+	}
+
+	if (OSNextTCB != NULL)
+	{
+		OSCurrentTCB = OSNextTCB;
+		OSNextTCB = NULL;
+		return;
+	}
+
 	sListGetIndexItem(&ReadyTaskList[OSHighestPriority], &pListItem);
 	OSCurrentTCB = (pTCB_t)pListItem->Owner;
 }

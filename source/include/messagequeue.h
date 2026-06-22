@@ -1,19 +1,18 @@
-#ifndef __MESSAGE_QUEUE_H__
-#define __MESSAGE_QUEUE_H_
+#ifndef __MESSAGEQUEUE_H__
+#define __MESSAGEQUEUE_H__
 
-#include "queue.h"
+#include "project_def.h"
 
 typedef struct MessageQueue MessageQueue_t;
 typedef MessageQueue_t *pMessageQueue_t;
 
 /**
  * @brief  消息队列构造函数
- * @param
- * @return  pQueueBase_t:队列指针，NULL:创建失败
+ * @param  MessageNum: 消息数量
+ * @param  MessageSize: 消息大小
+ * @return
  * @note
  */
 pMessageQueue_t xMessageQueueCreate(BaseType_t MessageNum, BaseType_t MessageSize);
-
-
 
 #endif

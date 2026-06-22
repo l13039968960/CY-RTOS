@@ -11,7 +11,7 @@
 #define __TASK_H__
 
 #include "project_def.h"
-#include "os_config.h"
+#include "../../include/os_config.h"
 #include "heap.h"
 
 struct TaskControBlocklHandler
@@ -21,11 +21,14 @@ struct TaskControBlocklHandler
 
 	uint8_t Task_Priority;
 
-	uint32_t Task_SizeOfStack; // 字
+	uint32_t Task_SizeOfStack; // 栈大小
 
 	TaskFunction Task_Fuction;
 
-	ListItem_t TaskListItem;
+	uint8_t Task_BasePriority; // 基础优先级
+	uint8_t Task_MutexCount;   // 互斥量计数器
+
+	ListItem_t TaskStateItem;
 	ListItem_t TaskEventItem;
 };
 

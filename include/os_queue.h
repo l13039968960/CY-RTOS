@@ -1,29 +1,20 @@
 #ifndef __OS_QUEUE_H__
 #define __OS_QUEUE_H__
 
-#include "os.h"
-#include "queue_ex.h"
+#include "../source/include/project_def.h"
+#include "../source/include/queue.h"
 
 typedef enum
 {
-	Pass = 0,
-	Fail,
-	ErrorPar,
+	OSQueuePass,
+	OSQueueFail,
+	OSQueueErrorPar,
 
 } OSQueueState_t;
 
-#define sOSMessageQueueCreate(QueueHandler, MessageNum, MessageSize) sOSQueueCreate(QueueHandler, MessageNum, MessageSize, MessageQueue)
+#define sOSMessageQueueCreate(QueueHandler, MessageNum, MessageSize) ((pMessageQueue_t)sOSQueueCreate(QueueHandler, MessageNum, MessageSize, MessageQueue))
 
-/**
- * @brief  队列创建函数
- * @param  QueueHandler: 队列句柄
- * @param  MessageNum: 大小
- * @param  MessageSize: 尺寸
- * @return
- * @note
- */
-pQueue_t sOSQueueCreate(BaseType_t MessageNum, BaseType_t MessageSize, Type_t type);
-
+void *sOSQueueCreate(BaseType_t MessageNum, BaseType_t MessageSize, Type_t type);
 /**
  * @brief  队列销毁函数
  * @param  QueueHandler: 队列句柄
@@ -36,7 +27,7 @@ void vOSQueueDestory(pQueue_t *QueueHandler);
  * @brief  队列发送函数
  * @param  QueueHandler: 队列句柄
  * @param  Data: 数据缓冲区
- * @param  WaitTick: 阻塞时间
+ * @param  WaitTick: 等待时间
  * @return
  * @note
  */
@@ -46,7 +37,7 @@ OSQueueState_t sOSQueueSend(pQueue_t QueueHandler, void *Data, BaseType_t WaitTi
  * @brief  队列接收函数
  * @param  QueueHandler: 队列句柄
  * @param  Data: 数据缓冲区
- * @param  WaitTick: 阻塞时间
+ * @param  WaitTick: 等待时间
  * @return
  * @note
  */

@@ -11,7 +11,7 @@
 #ifndef __LIST_H__
 #define __LIST_H__
 
-#include "os_config.h"
+#include "../../include/os_config.h"
 #include "project_def.h"
 
 #define sListGetHeadItem(List) (((List)->ListEndItem).NextListItem)
