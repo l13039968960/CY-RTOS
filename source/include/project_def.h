@@ -13,22 +13,23 @@
 #include "stdint.h"
 #include "stdio.h"
 
-typedef void (*TaskFunction)(void *);
-
 typedef enum
 {
-    pdFALSE = 0,
-    pdTRUE = 1
-} rState;
+	pdFALSE = 0,
+	pdTRUE
+} BaseState_t;
+
+typedef void (*TaskFunction)(void *);
+typedef uint32_t BaseType_t;
 
 #define MaxDelayTime 0xFFFFFFFFULL
 
 #define __is_null__(P) \
-    if (P == NULL)     \
-        return pdFALSE
+	if (P == NULL)     \
+	return pdFALSE
 
 #define __is_zero__(P) \
-    if (P == 0)        \
-        return pdFALSE
+	if (P < 0)         \
+	return pdFALSE
 
 #endif
